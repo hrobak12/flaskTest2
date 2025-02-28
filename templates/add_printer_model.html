@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Додати модель принтера{% endblock %}
+{% block content %}
+    <h1>Додати модель принтера</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="model_name" class="form-label">Назва моделі</label>
+            <input type="text" class="form-control" id="model_name" name="model_name" required>
+        </div>
+        <div class="mb-3">
+            <label for="ink_type" class="form-label">Тип чорнил</label>
+            <select class="form-select" id="ink_type" name="ink_type">
+                <option value="0">Тонер</option>
+                <option value="1">Рідкі чорнила</option>
+                <option value="2">Стрічка</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Додати</button>
+    </form>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Редагувати модель принтера{% endblock %}
+{% block content %}
+    <h1>Редагувати модель принтера</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="model_name" class="form-label">Назва моделі</label>
+            <input type="text" class="form-control" id="model_name" name="model_name" value="{{ model.model_name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="ink_type" class="form-label">Тип чорнил</label>
+            <select class="form-select" id="ink_type" name="ink_type" required>
+                <option value="0" {% if model.ink_type == 0 %}selected{% endif %}>Тонер</option>
+                <option value="1" {% if model.ink_type == 1 %}selected{% endif %}>Рідкі чорнила</option>
+                <option value="2" {% if model.ink_type == 2 %}selected{% endif %}>Стрічка</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Оновити</button>
+        <a href="{{ url_for('printer_models') }}" class="btn btn-secondary">Скасувати</a>
+    </form>
+{% endblock %}

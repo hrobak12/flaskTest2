@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Додати відділ{% endblock %}
+{% block content %}
+    <h1>Додати відділ</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="deptname" class="form-label">Назва відділу</label>
+            <input type="text" class="form-control" id="deptname" name="deptname" required>
+        </div>
+        <div class="mb-3">
+            <label for="is_exec" class="form-label">Тип</label>
+            <select class="form-select" id="is_exec" name="is_exec">
+                <option value="0">Клієнт</option>
+                <option value="1">Виконавець</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Додати</button>
+    </form>
+{% endblock %}

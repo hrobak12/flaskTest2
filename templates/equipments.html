@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Обладнання{% endblock %}
+{% block content %}
+    <h1>Список обладнання</h1>
+    <form method="GET" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Пошук за серійним номером" value="{{ search }}">
+            <button type="submit" class="btn btn-primary">Шукати</button>
+        </div>
+    </form>
+    <a href="{{ url_for('add_equipment') }}" class="btn btn-success mb-3">Додати обладнання</a>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Модель</th>
+                <th>Відділ</th>
+                <th>Серійний номер</th>
+                <th>Інвентарний номер</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for equip in equipments %}
+            <tr>
+                <td>{{ equip.id }}</td>
+                <td>{{ PrinterModel.query.get(equip.print_model).model_name }}</td>
+                <td>{{ RefillDept.query.get(equip.print_dept).deptname }}</td>
+                <td>{{ equip.serial_num }}</td>
+                <td>{{ equip.inventory_num }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

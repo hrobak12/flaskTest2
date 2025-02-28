@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Моделі принтерів{% endblock %}
+{% block content %}
+    <h1>Список моделей принтерів</h1>
+    <form method="GET" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Пошук за назвою" value="{{ search }}">
+            <button type="submit" class="btn btn-primary">Шукати</button>
+        </div>
+    </form>
+    <a href="{{ url_for('add_printer_model') }}" class="btn btn-success mb-3">Додати модель</a>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Назва</th>
+                <th>Тип чорнил</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for model in models %}
+            <tr>
+                <td>{{ model.id }}</td>
+                <td>{{ model.model_name }}</td>
+                <td>{{ {0: 'Тонер', 1: 'Рідкі чорнила', 2: 'Стрічка'}[model.ink_type] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Відділи{% endblock %}
+{% block content %}
+    <h1>Список відділів</h1>
+    <form method="GET" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Пошук за назвою" value="{{ search }}">
+            <button type="submit" class="btn btn-primary">Шукати</button>
+        </div>
+    </form>
+    <a href="{{ url_for('add_refill_dept') }}" class="btn btn-success mb-3">Додати відділ</a>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Назва</th>
+                <th>Тип</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dept in depts %}
+            <tr>
+                <td>{{ dept.id }}</td>
+                <td>{{ dept.deptname }}</td>
+                <td>{{ 'Виконавець' if dept.is_exec else 'Клієнт' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

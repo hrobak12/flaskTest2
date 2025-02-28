@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Логи подій{% endblock %}
+{% block content %}
+    <h1>Логи подій</h1>
+    <form method="GET" class="mb-3">
+        <div class="input-group">
+            <select name="table_filter" class="form-select w-auto">
+                <option value="">Усі таблиці</option>
+                <option value="cartridges" {% if table_filter == 'cartridges' %}selected{% endif %}>Картриджі</option>
+                <option value="cartrg_status" {% if table_filter == 'cartrg_status' %}selected{% endif %}>Статуси</option>
+            </select>
+            <select name="type_filter" class="form-select w-auto">
+                <option value="">Усі типи</option>
+                <option value="0" {% if type_filter == '0' %}selected{% endif %}>Створення</option>
+                <option value="1" {% if type_filter == '1' %}selected{% endif %}>Зміна</option>
+                <option value="2" {% if type_filter == '2' %}selected{% endif %}>Оновлення</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Фільтрувати</button>
+        </div>
+    </form>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Таблиця</th>
+                <th>Тип події</th>
+                <th>Користувач</th>
+                <th>Час</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.id }}</td>
+                <td>{{ log.table_name }}</td>
+                <td>{{ {0: 'Створення', 1: 'Зміна', 2: 'Оновлення'}[log.event_type] }}</td>
+                <td>{{ User.query.get(log.user_updated).humanname }}</td>
+                <td>{{ log.time_updated.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

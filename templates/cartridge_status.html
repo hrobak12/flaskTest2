@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Статуси картриджів{% endblock %}
+{% block content %}
+    <h1>Статуси картриджів</h1>
+    <form method="GET" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Пошук за серійним номером картриджа" value="{{ search }}">
+            <button type="submit" class="btn btn-primary">Шукати</button>
+        </div>
+    </form>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Картридж</th>
+                <th>Статус</th>
+                <th>Дата зміни</th>
+                <th>Трек-номер</th>
+                <th>Відділ</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for status in statuses %}
+            <tr>
+                <td>{{ status.id }}</td>
+                <td>{{ Cartridges.query.get(status.id).serial_num }}</td>
+                <td>{{ {0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений'}[status.status] }}</td>
+                <td>{{ status.date_ofchange.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ status.parcel_track or 'Немає' }}</td>
+                <td>{{ RefillDept.query.get(status.exec_dept).deptname }}</td>
+                <td>
+                    <form action="{{ url_for('update_status', status_id=status.id) }}" method="POST" class="d-inline">
+                        <select name="status" class="form-select d-inline w-auto">
+                            <option value="0" {% if status.status == 0 %}selected{% endif %}>Порожній</option>
+                            <option value="1" {% if status.status == 1 %}selected{% endif %}>Очікує заправки</option>
+                            <option value="2" {% if status.status == 2 %}selected{% endif %}>Заправлений</option>
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

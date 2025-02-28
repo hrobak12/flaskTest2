@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Редагувати обладнання{% endblock %}
+{% block content %}
+    <h1>Редагувати обладнання</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="print_model" class="form-label">Модель принтера</label>
+            <select class="form-select" id="print_model" name="print_model" required>
+                {% for model in models %}
+                    <option value="{{ model.id }}" {% if model.id == equip.print_model %}selected{% endif %}>
+                        {{ model.model_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="print_dept" class="form-label">Відділ</label>
+            <select class="form-select" id="print_dept" name="print_dept" required>
+                {% for dept in depts %}
+                    <option value="{{ dept.id }}" {% if dept.id == equip.print_dept %}selected{% endif %}>
+                        {{ dept.deptname }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="serial_num" class="form-label">Серійний номер</label>
+            <input type="number" class="form-control" id="serial_num" name="serial_num" value="{{ equip.serial_num }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="inventory_num" class="form-label">Інвентарний номер</label>
+            <input type="number" class="form-control" id="inventory_num" name="inventory_num" value="{{ equip.inventory_num }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Оновити</button>
+        <a href="{{ url_for('equipments') }}" class="btn btn-secondary">Скасувати</a>
+    </form>
+{% endblock %}
