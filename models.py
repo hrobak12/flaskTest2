@@ -1,14 +1,18 @@
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey, String, Integer, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 from sqlalchemy.sql.expression import literal
 from datetime import datetime
-from flask_login import UserMixin
+from flask_login import UserMixin  # Додаємо UserMixin
 
-class ShittyBase(DeclarativeBase):
-    pass
 
-class User(UserMixin, ShittyBase):
+db = SQLAlchemy()
+
+#class ShittyBase(DeclarativeBase):
+#    pass
+
+class User(db.Model, UserMixin):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
@@ -19,7 +23,7 @@ class User(UserMixin, ShittyBase):
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
     role: Mapped[str] = mapped_column(String(30), server_default="user")
 
-class RefillDept(ShittyBase):
+class RefillDept(db.Model):
     __tablename__ = "refill_dept"
     id: Mapped[int] = mapped_column(primary_key=True)
     deptname: Mapped[str] = mapped_column(String(30))
@@ -27,7 +31,7 @@ class RefillDept(ShittyBase):
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
-class PrinterModel(ShittyBase):
+class PrinterModel(db.Model):
     __tablename__ = "model_print"
     id: Mapped[int] = mapped_column(primary_key=True)
     model_name: Mapped[str] = mapped_column(String(30))
@@ -35,7 +39,7 @@ class PrinterModel(ShittyBase):
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
-class CustomerEquipment(ShittyBase):
+class CustomerEquipment(db.Model):
     __tablename__ = "custmr_equip"
     id: Mapped[int] = mapped_column(primary_key=True)
     print_model: Mapped[int] = mapped_column(ForeignKey(PrinterModel.id))
@@ -45,7 +49,7 @@ class CustomerEquipment(ShittyBase):
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
-class Cartridges(ShittyBase):
+class Cartridges(db.Model):
     __tablename__ = "cartridges"
     id: Mapped[int] = mapped_column(primary_key=True)
     serial_num: Mapped[int] = mapped_column(Integer, server_default=literal(0))
@@ -53,7 +57,7 @@ class Cartridges(ShittyBase):
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
-class CartridgeStatus(ShittyBase):
+class CartridgeStatus(db.Model):
     __tablename__ = "cartrg_status"
     id: Mapped[int] = mapped_column(primary_key=True)
     status: Mapped[int] = mapped_column(Integer, server_default=literal(0))
@@ -63,7 +67,7 @@ class CartridgeStatus(ShittyBase):
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
-class EventLog(ShittyBase):
+class EventLog(db.Model):
     __tablename__ = "event_log"
     id: Mapped[int] = mapped_column(primary_key=True)
     table_name: Mapped[str] = mapped_column(String(30))

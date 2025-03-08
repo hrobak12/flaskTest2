@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import ShittyBase, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog
+from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog
 import bcrypt
 
 app = Flask(__name__)
@@ -9,17 +9,14 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cartridge.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+#db = SQLAlchemy(app)
+db.init_app(app)  # Ініціалізація db з додатком
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
-# Ініціалізація бази даних
-with app.app_context():
-    db.Model.metadata.create_all(db.engine)
 
 # Допоміжні функції
 def hash_password(password):
@@ -35,6 +32,37 @@ def admin_required(f):
         return f(*args, **kwargs)
     wrapper.__name__ = f.__name__
     return wrapper
+
+# Допоміжні функції
+def hash_password(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+# Ініціалізація бази даних
+#with app.app_context():
+#    db.Model.metadata.create_all(db.engine)
+
+# Ініціалізація бази даних і створення початкового користувача
+with app.app_context():
+    db.create_all()
+    # Перевіряємо, чи є користувач admin
+    admin_user = User.query.filter_by(username='admin').first()
+    if not admin_user:
+        # Створюємо користувача admin, якщо його немає
+        admin_password = hash_password('admin')
+        admin = User(
+            username='admin',
+            password=admin_password,
+            humanname='Administrator',
+            role='admin'
+        )
+        db.session.add(admin)
+        db.session.commit()
+        print("Користувач admin створений!")
+    else:
+        print("Користувач admin уже існує.")
 
 @app.route('/')
 @login_required
@@ -352,6 +380,82 @@ def event_log():
         query = query.filter(EventLog.event_type == int(type_filter))
     logs = query.all()
     return render_template('event_log.html', logs=logs, table_filter=table_filter, type_filter=type_filter)
+
+# Додавання користувача
+@app.route('/users')
+@admin_required
+@login_required
+def users():
+    search = request.args.get('search', '')
+    users_list = User.query.filter(User.username.ilike(f'%{search}%')).all()
+    return render_template('users.html', users=users_list, search=search)
+
+@app.route('/add_user', methods=['GET', 'POST'])
+@admin_required
+@login_required
+def add_user():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        humanname = request.form['humanname']
+        role = request.form['role']
+
+        if User.query.filter_by(username=username).first():
+            flash('Користувач із таким логіном уже існує!')
+            return render_template('add_user.html')
+
+        hashed_password = hash_password(password)
+        new_user = User(
+            username=username,
+            password=hashed_password,
+            humanname=humanname,
+            role=role
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Користувача додано!')
+        return redirect(url_for('users'))
+    return render_template('add_user.html')
+
+# Редагування користувача
+@app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
+@admin_required
+@login_required
+def edit_user(user_id):
+    user = User.query.get_or_404(user_id)
+    if request.method == 'POST':
+        username = request.form['username']
+        humanname = request.form['humanname']
+        role = request.form['role']
+        password = request.form['password']
+
+        if User.query.filter(User.username == username, User.id != user_id).first():
+            flash('Користувач із таким логіном уже існує!')
+            return render_template('edit_user.html', user=user)
+
+        user.username = username
+        user.humanname = humanname
+        user.role = role
+        if password:  # Оновлюємо пароль, якщо введено новий
+            user.password = hash_password(password)
+        db.session.commit()
+        flash('Користувача оновлено!')
+        return redirect(url_for('users'))
+    return render_template('edit_user.html', user=user)
+
+# Видалення користувача
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+@admin_required
+@login_required
+def delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        flash('Ви не можете видалити себе!')
+        return redirect(url_for('users'))
+    db.session.delete(user)
+    db.session.commit()
+    flash('Користувача видалено!')
+    return redirect(url_for('users'))
 
 if __name__ == '__main__':
     app.run(debug=True)
