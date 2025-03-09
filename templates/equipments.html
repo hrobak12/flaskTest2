@@ -8,7 +8,10 @@
             <button type="submit" class="btn btn-primary">Шукати</button>
         </div>
     </form>
-    <a href="{{ url_for('add_equipment') }}" class="btn btn-success mb-3">Додати обладнання</a>
+    <div class="mb-3">
+        <a href="{{ url_for('add_equipment') }}" class="btn btn-success">Додати обладнання</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+    </div>
     <table class="table table-striped">
         <thead>
             <tr>
