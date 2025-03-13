@@ -199,7 +199,7 @@ def delete_printer_model(model_id):
 def equipments():
     search = request.args.get('search', '')
     equipments = CustomerEquipment.query.filter(CustomerEquipment.serial_num.ilike(f'%{search}%')).all()
-    return render_template('equipments.html', equipments=equipments, search=search)
+    return render_template('equipments.html', RefillDept = RefillDept, PrinterModel = PrinterModel,  equipments=equipments, search=search)
 
 @app.route('/add_equipment', methods=['GET', 'POST'])
 @admin_required
@@ -266,7 +266,7 @@ def delete_equipment(equip_id):
 def cartridges():
     search = request.args.get('search', '')
     cartridges = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%')).all()
-    return render_template('cartridges.html', cartridges=cartridges, search=search)
+    return render_template('cartridges.html', RefillDept=RefillDept, CustomerEquipment=CustomerEquipment, cartridges=cartridges, search=search)
 
 @app.route('/add_cartridge', methods=['GET', 'POST'])
 @login_required

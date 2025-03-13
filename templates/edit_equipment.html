@@ -25,11 +25,11 @@
         </div>
         <div class="mb-3">
             <label for="serial_num" class="form-label">Серійний номер</label>
-            <input type="number" class="form-control" id="serial_num" name="serial_num" value="{{ equip.serial_num }}" required>
+            <input type="text" class="form-control" id="serial_num" name="serial_num" value="{{ equip.serial_num }}" required>
         </div>
         <div class="mb-3">
             <label for="inventory_num" class="form-label">Інвентарний номер</label>
-            <input type="number" class="form-control" id="inventory_num" name="inventory_num" value="{{ equip.inventory_num }}" required>
+            <input type="text" class="form-control" id="inventory_num" name="inventory_num" value="{{ equip.inventory_num }}" required>
         </div>
         <button type="submit" class="btn btn-primary">Оновити</button>
         <a href="{{ url_for('equipments') }}" class="btn btn-secondary">Скасувати</a>
