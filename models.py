@@ -4,13 +4,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 from sqlalchemy.sql.expression import literal
 from datetime import datetime
-from flask_login import UserMixin  # Додаємо UserMixin
-
+from flask_login import UserMixin
 
 db = SQLAlchemy()
-
-#class ShittyBase(DeclarativeBase):
-#    pass
 
 class User(db.Model, UserMixin):
     __tablename__ = "users"
@@ -44,21 +40,15 @@ class CustomerEquipment(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     print_model: Mapped[int] = mapped_column(ForeignKey(PrinterModel.id))
     print_dept: Mapped[int] = mapped_column(ForeignKey(RefillDept.id))
-#    serial_num: Mapped[int] = mapped_column(Integer, server_default=literal(0))
-#    inventory_num: Mapped[int] = mapped_column(Integer, server_default=literal(0))
-    serial_num: Mapped[str] = mapped_column(String(255), server_default="N/A")  # or Text() if more space is needed
-    inventory_num: Mapped[str] = mapped_column(String(255), server_default="N/A")  # or Text() for larger values
-
-
+    serial_num: Mapped[str] = mapped_column(String(255), server_default="N/A")
+    inventory_num: Mapped[str] = mapped_column(String(255), server_default="N/A")
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
 class Cartridges(db.Model):
     __tablename__ = "cartridges"
     id: Mapped[int] = mapped_column(primary_key=True)
-#    serial_num: Mapped[int] = mapped_column(Integer, server_default=literal(0))
-    serial_num: Mapped[str] = mapped_column(String(255), server_default="N/A")  # or Text() if more space is needed
-
+    serial_num: Mapped[str] = mapped_column(String(255), server_default="N/A")
     in_printer: Mapped[int] = mapped_column(ForeignKey(CustomerEquipment.id), nullable=True)
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())

@@ -2,36 +2,32 @@
 {% block title %}Редагувати обладнання{% endblock %}
 {% block content %}
     <h1>Редагувати обладнання</h1>
-    <form method="POST">
+    <form method="POST" class="mb-3">
         <div class="mb-3">
             <label for="print_model" class="form-label">Модель принтера</label>
-            <select class="form-select" id="print_model" name="print_model" required>
+            <select name="print_model" id="print_model" class="form-control" required>
                 {% for model in models %}
-                    <option value="{{ model.id }}" {% if model.id == equip.print_model %}selected{% endif %}>
-                        {{ model.model_name }}
-                    </option>
+                    <option value="{{ model.id }}" {% if model.id == equip.print_model %}selected{% endif %}>{{ model.model_name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div class="mb-3">
             <label for="print_dept" class="form-label">Відділ</label>
-            <select class="form-select" id="print_dept" name="print_dept" required>
+            <select name="print_dept" id="print_dept" class="form-control" required>
                 {% for dept in depts %}
-                    <option value="{{ dept.id }}" {% if dept.id == equip.print_dept %}selected{% endif %}>
-                        {{ dept.deptname }}
-                    </option>
+                    <option value="{{ dept.id }}" {% if dept.id == equip.print_dept %}selected{% endif %}>{{ dept.deptname }}</option>
                 {% endfor %}
             </select>
         </div>
         <div class="mb-3">
             <label for="serial_num" class="form-label">Серійний номер</label>
-            <input type="text" class="form-control" id="serial_num" name="serial_num" value="{{ equip.serial_num }}" required>
+            <input type="text" name="serial_num" id="serial_num" class="form-control" value="{{ equip.serial_num }}" required>
         </div>
         <div class="mb-3">
             <label for="inventory_num" class="form-label">Інвентарний номер</label>
-            <input type="text" class="form-control" id="inventory_num" name="inventory_num" value="{{ equip.inventory_num }}" required>
+            <input type="text" name="inventory_num" id="inventory_num" class="form-control" value="{{ equip.inventory_num }}" required>
         </div>
-        <button type="submit" class="btn btn-primary">Оновити</button>
+        <button type="submit" class="btn btn-primary">Зберегти</button>
         <a href="{{ url_for('equipments') }}" class="btn btn-secondary">Скасувати</a>
     </form>
 {% endblock %}

@@ -28,7 +28,8 @@
                 <td>{{ cartridge.serial_num }}</td>
                 <td>
                     {% if cartridge.in_printer %}
-                        {{ CustomerEquipment.query.get(cartridge.in_printer).serial_num }} (ID: {{ cartridge.in_printer }})
+                        {% set equipment = CustomerEquipment.query.get(cartridge.in_printer) %}
+                        {{ PrinterModel.query.get(equipment.print_model).model_name }} ({{ RefillDept.query.get(equipment.print_dept).deptname }})
                     {% else %}
                         Немає
                     {% endif %}

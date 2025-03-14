@@ -9,8 +9,7 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cartridge.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-#db = SQLAlchemy(app)
-db.init_app(app)  # Ініціалізація db з додатком
+db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
@@ -33,31 +32,13 @@ def admin_required(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
-# Допоміжні функції
-def hash_password(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def check_password(password, hashed):
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-
-# Ініціалізація бази даних
-#with app.app_context():
-#    db.Model.metadata.create_all(db.engine)
-
 # Ініціалізація бази даних і створення початкового користувача
 with app.app_context():
     db.create_all()
-    # Перевіряємо, чи є користувач admin
     admin_user = User.query.filter_by(username='admin').first()
     if not admin_user:
-        # Створюємо користувача admin, якщо його немає
         admin_password = hash_password('admin')
-        admin = User(
-            username='admin',
-            password=admin_password,
-            humanname='Administrator',
-            role='admin'
-        )
+        admin = User(username='admin', password=admin_password, humanname='Administrator', role='admin')
         db.session.add(admin)
         db.session.commit()
         print("Користувач admin створений!")
@@ -199,7 +180,7 @@ def delete_printer_model(model_id):
 def equipments():
     search = request.args.get('search', '')
     equipments = CustomerEquipment.query.filter(CustomerEquipment.serial_num.ilike(f'%{search}%')).all()
-    return render_template('equipments.html', RefillDept = RefillDept, PrinterModel = PrinterModel,  equipments=equipments, search=search)
+    return render_template('equipments.html', RefillDept=RefillDept, PrinterModel=PrinterModel, equipments=equipments, search=search)
 
 @app.route('/add_equipment', methods=['GET', 'POST'])
 @admin_required
@@ -266,7 +247,12 @@ def delete_equipment(equip_id):
 def cartridges():
     search = request.args.get('search', '')
     cartridges = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%')).all()
-    return render_template('cartridges.html', RefillDept=RefillDept, CustomerEquipment=CustomerEquipment, cartridges=cartridges, search=search)
+    return render_template('cartridges.html',
+                           RefillDept=RefillDept,
+                           CustomerEquipment=CustomerEquipment,
+                           PrinterModel=PrinterModel,  # Додаємо PrinterModel
+                           cartridges=cartridges,
+                           search=search)
 
 @app.route('/add_cartridge', methods=['GET', 'POST'])
 @login_required
@@ -348,7 +334,11 @@ def cartridge_status():
     statuses = CartridgeStatus.query.join(Cartridges, Cartridges.id == CartridgeStatus.id).filter(
         Cartridges.serial_num.ilike(f'%{search}%')
     ).all()
-    return render_template('cartridge_status.html', statuses=statuses, search=search)
+    return render_template('cartridge_status.html',
+                           statuses=statuses,
+                           search=search,
+                           Cartridges=Cartridges,  # Додаємо модель Cartridges
+                           RefillDept=RefillDept)  # Додаємо модель RefillDept
 
 @app.route('/update_status/<int:status_id>', methods=['POST'])
 @login_required
@@ -367,6 +357,21 @@ def update_status(status_id):
     flash('Статус оновлено!')
     return redirect(url_for('cartridge_status'))
 
+@app.route('/delete_status/<int:status_id>', methods=['POST'])
+@login_required
+def delete_status(status_id):
+    status = CartridgeStatus.query.get_or_404(status_id)
+    db.session.delete(status)
+    event = EventLog(
+        table_name='cartrg_status',
+        event_type=3,  # Видалення статусу (новий тип події)
+        user_updated=current_user.id
+    )
+    db.session.add(event)
+    db.session.commit()
+    flash('Статус видалено!')
+    return redirect(url_for('cartridge_status'))
+
 # Перегляд логів подій
 @app.route('/event_log')
 @login_required
@@ -379,7 +384,7 @@ def event_log():
     if type_filter:
         query = query.filter(EventLog.event_type == int(type_filter))
     logs = query.all()
-    return render_template('event_log.html', logs=logs, table_filter=table_filter, type_filter=type_filter)
+    return render_template('event_log.html', User=User, logs=logs, table_filter=table_filter, type_filter=type_filter)
 
 # Додавання користувача
 @app.route('/users')
@@ -399,25 +404,17 @@ def add_user():
         password = request.form['password']
         humanname = request.form['humanname']
         role = request.form['role']
-
         if User.query.filter_by(username=username).first():
             flash('Користувач із таким логіном уже існує!')
             return render_template('add_user.html')
-
         hashed_password = hash_password(password)
-        new_user = User(
-            username=username,
-            password=hashed_password,
-            humanname=humanname,
-            role=role
-        )
+        new_user = User(username=username, password=hashed_password, humanname=humanname, role=role)
         db.session.add(new_user)
         db.session.commit()
         flash('Користувача додано!')
         return redirect(url_for('users'))
     return render_template('add_user.html')
 
-# Редагування користувача
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @admin_required
 @login_required
@@ -428,22 +425,19 @@ def edit_user(user_id):
         humanname = request.form['humanname']
         role = request.form['role']
         password = request.form['password']
-
         if User.query.filter(User.username == username, User.id != user_id).first():
             flash('Користувач із таким логіном уже існує!')
             return render_template('edit_user.html', user=user)
-
         user.username = username
         user.humanname = humanname
         user.role = role
-        if password:  # Оновлюємо пароль, якщо введено новий
+        if password:
             user.password = hash_password(password)
         db.session.commit()
         flash('Користувача оновлено!')
         return redirect(url_for('users'))
     return render_template('edit_user.html', user=user)
 
-# Видалення користувача
 @app.route('/delete_user/<int:user_id>', methods=['POST'])
 @admin_required
 @login_required
