@@ -2,18 +2,19 @@
 {% block title %}Додати відділ{% endblock %}
 {% block content %}
     <h1>Додати відділ</h1>
-    <form method="POST">
+    <form method="POST" class="mb-3">
         <div class="mb-3">
             <label for="deptname" class="form-label">Назва відділу</label>
-            <input type="text" class="form-control" id="deptname" name="deptname" required>
+            <input type="text" name="deptname" id="deptname" class="form-control" required>
         </div>
         <div class="mb-3">
-            <label for="is_exec" class="form-label">Тип</label>
-            <select class="form-select" id="is_exec" name="is_exec">
+            <label for="is_exec" class="form-label">Тип відділу</label>
+            <select name="is_exec" id="is_exec" class="form-select" required>
                 <option value="0">Клієнт</option>
                 <option value="1">Виконавець</option>
             </select>
         </div>
         <button type="submit" class="btn btn-primary">Додати</button>
+        <a href="{{ url_for('refill_depts') }}" class="btn btn-secondary">Скасувати</a>
     </form>
 {% endblock %}

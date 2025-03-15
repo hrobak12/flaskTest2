@@ -17,6 +17,7 @@
             <tr>
                 <th>ID</th>
                 <th>Серійний номер</th>
+                <th>Модель картриджа</th>  <!-- Нова колонка -->
                 <th>У принтері</th>
                 <th>Дії</th>
             </tr>
@@ -26,6 +27,7 @@
             <tr>
                 <td>{{ cartridge.id }}</td>
                 <td>{{ cartridge.serial_num }}</td>
+                <td>{{ cartridge.cartridge_model or 'Не вказано' }}</td>
                 <td>
                     {% if cartridge.in_printer %}
                         {% set equipment = CustomerEquipment.query.get(cartridge.in_printer) %}

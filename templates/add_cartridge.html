@@ -8,14 +8,19 @@
             <input type="text" class="form-control" id="serial_num" name="serial_num" required>
         </div>
         <div class="mb-3">
-            <label for="in_printer" class="form-label">ID принтера</label>
+            <label for="cartridge_model" class="form-label">Модель картриджа</label>
+            <input type="text" class="form-control" id="cartridge_model" name="cartridge_model">
+        </div>
+        <div class="mb-3">
+            <label for="in_printer" class="form-label">У принтері</label>
             <select class="form-select" id="in_printer" name="in_printer">
                 <option value="">Немає</option>
                 {% for equip in equipments %}
-                    <option value="{{ equip.id }}">{{ equip.id }} - {{ equip.serial_num }}</option>
+                    <option value="{{ equip.id }}">{{ equip.serial_num }} ({{ PrinterModel.query.get(equip.print_model).model_name }})</option>
                 {% endfor %}
             </select>
         </div>
         <button type="submit" class="btn btn-primary">Додати</button>
+        <a href="{{ url_for('cartridges') }}" class="btn btn-secondary">Скасувати</a>
     </form>
 {% endblock %}

@@ -50,6 +50,7 @@ class Cartridges(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     serial_num: Mapped[str] = mapped_column(String(255), server_default="N/A")
     in_printer: Mapped[int] = mapped_column(ForeignKey(CustomerEquipment.id), nullable=True)
+    cartridge_model: Mapped[str] = mapped_column(String(255), nullable=True)  # Текстове поле
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 

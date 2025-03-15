@@ -2,19 +2,19 @@
 {% block title %}Редагувати відділ{% endblock %}
 {% block content %}
     <h1>Редагувати відділ</h1>
-    <form method="POST">
+    <form method="POST" class="mb-3">
         <div class="mb-3">
             <label for="deptname" class="form-label">Назва відділу</label>
-            <input type="text" class="form-control" id="deptname" name="deptname" value="{{ dept.deptname }}" required>
+            <input type="text" name="deptname" id="deptname" class="form-control" value="{{ dept.deptname }}" required>
         </div>
         <div class="mb-3">
-            <label for="is_exec" class="form-label">Тип</label>
-            <select class="form-select" id="is_exec" name="is_exec" required>
-                <option value="0" {% if dept.is_exec == 0 %}selected{% endif %}>Клієнт</option>
-                <option value="1" {% if dept.is_exec == 1 %}selected{% endif %}>Виконавець</option>
+            <label for="is_exec" class="form-label">Тип відділу</label>
+            <select name="is_exec" id="is_exec" class="form-select" required>
+                <option value="0" {% if not dept.is_exec %}selected{% endif %}>Клієнт</option>
+                <option value="1" {% if dept.is_exec %}selected{% endif %}>Виконавець</option>
             </select>
         </div>
-        <button type="submit" class="btn btn-primary">Оновити</button>
+        <button type="submit" class="btn btn-primary">Зберегти</button>
         <a href="{{ url_for('refill_depts') }}" class="btn btn-secondary">Скасувати</a>
     </form>
 {% endblock %}

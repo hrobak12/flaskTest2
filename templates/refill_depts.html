@@ -19,6 +19,7 @@
                 <th>ID</th>
                 <th>Назва</th>
                 <th>Тип</th>
+                <th>Дії</th>
             </tr>
         </thead>
         <tbody>
@@ -26,9 +27,62 @@
             <tr>
                 <td>{{ dept.id }}</td>
                 <td>{{ dept.deptname }}</td>
-                <td>{{ 'Виконавець' if dept.is_exec else 'Клієнт' }}</td>
+                <td>
+                    {% if dept.is_exec %}
+                        <span class="badge bg-success">Виконавець</span>
+                    {% else %}
+                        <span class="badge bg-primary">Клієнт</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('edit_refill_dept', dept_id=dept.id) }}" class="btn btn-warning btn-sm">Редагувати</a>
+                    <form action="{{ url_for('delete_refill_dept', dept_id=dept.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Ви впевнені, що хочете видалити цей відділ?');">
+                        <button type="submit" class="btn btn-danger btn-sm">Видалити</button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+
+    <!-- Пагінація -->
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('refill_depts', page=pagination.prev_num, search=search) }}">Попередня</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">Попередня</span>
+                </li>
+            {% endif %}
+            {% for page_num in pagination.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                    {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('refill_depts', page=page_num, search=search) }}">{{ page_num }}</a>
+                        </li>
+                    {% endif %}
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('refill_depts', page=pagination.next_num, search=search) }}">Наступна</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">Наступна</span>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
 {% endblock %}

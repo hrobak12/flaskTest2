@@ -13,3 +13,8 @@ body {
 .btn-sm {
     margin-right: 5px;
 }
+
+.bg-dark-purple {
+    background-color: #4B0082 !important; /* Темний фіолетовий */
+    color: white;
+}

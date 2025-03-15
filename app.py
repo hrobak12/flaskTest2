@@ -4,6 +4,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog
 import bcrypt
 
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cartridge.db'
@@ -31,6 +32,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     wrapper.__name__ = f.__name__
     return wrapper
+
 
 # Ініціалізація бази даних і створення початкового користувача
 with app.app_context():
@@ -73,8 +75,14 @@ def logout():
 @login_required
 def refill_depts():
     search = request.args.get('search', '')
-    depts = RefillDept.query.filter(RefillDept.deptname.ilike(f'%{search}%')).all()
-    return render_template('refill_depts.html', depts=depts, search=search)
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Кількість записів на сторінці
+    query = RefillDept.query.filter(RefillDept.deptname.ilike(f'%{search}%'))
+    pagination = query.paginate(page=page, per_page=per_page)
+    return render_template('refill_depts.html',
+                           depts=pagination.items,
+                           pagination=pagination,
+                           search=search)
 
 @app.route('/add_refill_dept', methods=['GET', 'POST'])
 @admin_required
@@ -117,6 +125,12 @@ def edit_refill_dept(dept_id):
 def delete_refill_dept(dept_id):
     dept = RefillDept.query.get_or_404(dept_id)
     db.session.delete(dept)
+    event = EventLog(
+        table_name='refill_dept',
+        event_type=3,  # Видалення (новий тип події)
+        user_updated=current_user.id
+    )
+    db.session.add(event)
     db.session.commit()
     flash('Відділ видалено!')
     return redirect(url_for('refill_depts'))
@@ -126,8 +140,14 @@ def delete_refill_dept(dept_id):
 @login_required
 def printer_models():
     search = request.args.get('search', '')
-    models = PrinterModel.query.filter(PrinterModel.model_name.ilike(f'%{search}%')).all()
-    return render_template('printer_models.html', models=models, search=search)
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Кількість записів на сторінці
+    query = PrinterModel.query.filter(PrinterModel.model_name.ilike(f'%{search}%'))
+    pagination = query.paginate(page=page, per_page=per_page)
+    return render_template('printer_models.html',
+                           models=pagination.items,
+                           pagination=pagination,
+                           search=search)
 
 @app.route('/add_printer_model', methods=['GET', 'POST'])
 @admin_required
@@ -170,6 +190,12 @@ def edit_printer_model(model_id):
 def delete_printer_model(model_id):
     model = PrinterModel.query.get_or_404(model_id)
     db.session.delete(model)
+    event = EventLog(
+        table_name='model_print',
+        event_type=3,  # Видалення (новий тип події)
+        user_updated=current_user.id
+    )
+    db.session.add(event)
     db.session.commit()
     flash('Модель видалено!')
     return redirect(url_for('printer_models'))
@@ -250,7 +276,7 @@ def cartridges():
     return render_template('cartridges.html',
                            RefillDept=RefillDept,
                            CustomerEquipment=CustomerEquipment,
-                           PrinterModel=PrinterModel,  # Додаємо PrinterModel
+                           PrinterModel=PrinterModel,  # Залишаємо для "У принтері"
                            cartridges=cartridges,
                            search=search)
 
@@ -263,9 +289,11 @@ def add_cartridge():
             flash('Картридж із таким серійним номером уже існує!')
             return render_template('add_cartridge.html', equipments=CustomerEquipment.query.all())
         in_printer = request.form['in_printer'] or None
+        cartridge_model = request.form['cartridge_model']  # Текстове поле
         cartridge = Cartridges(
             serial_num=serial_num,
             in_printer=in_printer,
+            cartridge_model=cartridge_model or None,  # Залишаємо None, якщо порожнє
             user_updated=current_user.id
         )
         db.session.add(cartridge)
@@ -286,6 +314,7 @@ def edit_cartridge(cartridge_id):
             return render_template('edit_cartridge.html', cartridge=cartridge, equipments=CustomerEquipment.query.all())
         cartridge.serial_num = serial_num
         cartridge.in_printer = request.form['in_printer'] or None
+        cartridge.cartridge_model = request.form['cartridge_model'] or None  # Текстове поле
         cartridge.user_updated = current_user.id
         db.session.commit()
         flash('Картридж оновлено!')
