@@ -2,8 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, abo
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog
+from datetime import datetime
 import bcrypt
-
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
@@ -282,6 +282,7 @@ def cartridges():
 
 @app.route('/add_cartridge', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def add_cartridge():
     if request.method == 'POST':
         serial_num = request.form['serial_num']
@@ -301,10 +302,11 @@ def add_cartridge():
         flash('Картридж додано!')
         return redirect(url_for('cartridges'))
     equipments = CustomerEquipment.query.all()
-    return render_template('add_cartridge.html', equipments=equipments)
+    return render_template('add_cartridge.html', PrinterModel = PrinterModel, equipments=equipments)
 
 @app.route('/edit_cartridge/<int:cartridge_id>', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def edit_cartridge(cartridge_id):
     cartridge = Cartridges.query.get_or_404(cartridge_id)
     if request.method == 'POST':
@@ -320,10 +322,11 @@ def edit_cartridge(cartridge_id):
         flash('Картридж оновлено!')
         return redirect(url_for('cartridges'))
     equipments = CustomerEquipment.query.all()
-    return render_template('edit_cartridge.html', cartridge=cartridge, equipments=equipments)
+    return render_template('edit_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, cartridge=cartridge, equipments=equipments)
 
 @app.route('/delete_cartridge/<int:cartridge_id>', methods=['POST'])
 @login_required
+@admin_required
 def delete_cartridge(cartridge_id):
     cartridge = Cartridges.query.get_or_404(cartridge_id)
     db.session.delete(cartridge)
@@ -403,6 +406,7 @@ def delete_status(status_id):
 
 # Перегляд логів подій
 @app.route('/event_log')
+@admin_required
 @login_required
 def event_log():
     table_filter = request.args.get('table_filter', '')
@@ -480,5 +484,6 @@ def delete_user(user_id):
     flash('Користувача видалено!')
     return redirect(url_for('users'))
 
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

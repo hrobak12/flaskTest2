@@ -17,7 +17,7 @@
             <tr>
                 <th>ID</th>
                 <th>Серійний номер</th>
-                <th>Модель картриджа</th>  <!-- Нова колонка -->
+                <th>Модель картриджа</th>
                 <th>У принтері</th>
                 <th>Дії</th>
             </tr>
@@ -27,8 +27,10 @@
             <tr>
                 <td>{{ cartridge.id }}</td>
                 <td>{{ cartridge.serial_num }}</td>
-                <td>{{ cartridge.cartridge_model or 'Не вказано' }}</td>
-                <td>
+                <td class="cartridge-model" title="{{ cartridge.cartridge_model or 'Не вказано' }}">
+                    {{ cartridge.cartridge_model or 'Не вказано' }}
+                </td>
+                <td class="in-printer" title="{% if cartridge.in_printer %}{% set equipment = CustomerEquipment.query.get(cartridge.in_printer) %}{{ PrinterModel.query.get(equipment.print_model).model_name }} ({{ RefillDept.query.get(equipment.print_dept).deptname }}){% else %}Немає{% endif %}">
                     {% if cartridge.in_printer %}
                         {% set equipment = CustomerEquipment.query.get(cartridge.in_printer) %}
                         {{ PrinterModel.query.get(equipment.print_model).model_name }} ({{ RefillDept.query.get(equipment.print_dept).deptname }})
@@ -36,12 +38,12 @@
                         Немає
                     {% endif %}
                 </td>
-                <td>
+                <td class="actions-column">
                     <a href="{{ url_for('edit_cartridge', cartridge_id=cartridge.id) }}" class="btn btn-info btn-sm">Редагувати</a>
                     <form action="{{ url_for('delete_cartridge', cartridge_id=cartridge.id) }}" method="POST" class="d-inline">
                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені?')">Видалити</button>
                     </form>
-                    <form action="{{ url_for('send_to_refill', cartridge_id=cartridge.id) }}" method="POST" class="d-inline">
+                    <form action="{{ url_for('send_to_refill', cartridge_id=cartridge.id) }}" method="POST" class="d-inline send-to-refill">
                         <select name="exec_dept_id" class="form-select d-inline w-auto">
                             {% for dept in RefillDept.query.filter_by(is_exec=1).all() %}
                                 <option value="{{ dept.id }}">{{ dept.deptname }}</option>
@@ -55,4 +57,29 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <style>
+        .cartridge-model, .in-printer {
+            max-width: 200px; /* Обмежуємо ширину колонок */
+            white-space: nowrap; /* Запобігаємо перенесенню тексту */
+            overflow: hidden; /* Ховаємо зайвий текст */
+            text-overflow: ellipsis; /* Додаємо три крапки */
+        }
+
+        .actions-column {
+            white-space: nowrap; /* Усі елементи в один рядок */
+            vertical-align: middle;
+        }
+
+        .send-to-refill {
+            display: inline-flex; /* Вирівнюємо елементи форми горизонтально */
+            align-items: center; /* Вирівнювання по вертикалі */
+            gap: 5px; /* Відстань між елементами */
+        }
+
+        .send-to-refill .form-control,
+        .send-to-refill .form-select {
+            margin: 0; /* Прибираємо стандартні відступи */
+        }
+    </style>
 {% endblock %}

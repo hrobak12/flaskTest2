@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Користувачі{% endblock %}
+{% block content %}
+    <h1>Список користувачів</h1>
+    <form method="GET" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Пошук за іменем" value="{{ search }}">
+            <button type="submit" class="btn btn-primary">Шукати</button>
+            <a href="{{ url_for('users') }}" class="btn btn-secondary">Скасувати</a>
+        </div>
+    </form>
+    <div class="mb-3">
+        <a href="{{ url_for('add_user') }}" class="btn btn-success">Додати користувача</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+    </div>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Ім'я користувача</th>
+                <th>Повне ім'я</th>
+                <th>Роль</th>
+                <th>Активний</th>
+                <th>Останній вхід</th>
+                <th>Оновлено</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.humanname }}</td>
+                <td>
+                    {% if user.role == 'admin' %}
+                        <span class="badge bg-success">Адмін</span>
+                    {% else %}
+                        <span class="badge bg-primary">Користувач</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if user.active %}
+                        <span class="badge bg-success">Так</span>
+                    {% else %}
+                        <span class="badge bg-danger">Ні</span>
+                    {% endif %}
+                </td>
+                <td>{{ user.lastlogin.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ user.time_updated.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-warning btn-sm">Редагувати</a>
+                    <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Ви впевнені, що хочете видалити цього користувача?');">
+                        <button type="submit" class="btn btn-danger btn-sm">Видалити</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

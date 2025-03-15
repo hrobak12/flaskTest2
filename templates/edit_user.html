@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Редагувати користувача{% endblock %}
+{% block content %}
+    <h1>Редагувати користувача</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="username" class="form-label">Ім'я користувача</label>
+            <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required maxlength="30">
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Новий пароль (залиште порожнім, якщо не змінювати)</label>
+            <input type="password" class="form-control" id="password" name="password">
+        </div>
+        <div class="mb-3">
+            <label for="humanname" class="form-label">Повне ім'я</label>
+            <input type="text" class="form-control" id="humanname" name="humanname" value="{{ user.humanname }}" required maxlength="60">
+        </div>
+        <div class="mb-3">
+            <label for="role" class="form-label">Роль</label>
+            <select class="form-select" id="role" name="role" required>
+                <option value="user" {% if user.role == 'user' %}selected{% endif %}>Користувач</option>
+                <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Адміністратор</option>
+            </select>
+        </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="active" name="active" {% if user.active %}checked{% endif %}>
+            <label class="form-check-label" for="active">Активний</label>
+        </div>
+        <button type="submit" class="btn btn-primary">Оновити</button>
+        <a href="{{ url_for('users') }}" class="btn btn-secondary">Скасувати</a>
+    </form>
+{% endblock %}
