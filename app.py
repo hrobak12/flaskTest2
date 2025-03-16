@@ -290,13 +290,22 @@ def delete_equipment(equip_id):
 @login_required
 def cartridges():
     search = request.args.get('search', '')
-    cartridges = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%')).all()
+    page = request.args.get('page', 1, type=int)  # Отримуємо номер сторінки з URL
+    per_page = 10  # Кількість записів на сторінці (можете змінити)
+
+    # Базовий запит із фільтром пошуку
+    query = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
+    # Додаємо пагінацію
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    cartridges = pagination.items  # Картриджі на поточній сторінці
+
     return render_template('cartridges.html',
                            RefillDept=RefillDept,
                            CustomerEquipment=CustomerEquipment,
-                           PrinterModel=PrinterModel,  # Залишаємо для "У принтері"
+                           PrinterModel=PrinterModel,
                            cartridges=cartridges,
-                           search=search)
+                           search=search,
+                           pagination=pagination)
 
 @app.route('/add_cartridge', methods=['GET', 'POST'])
 @login_required
