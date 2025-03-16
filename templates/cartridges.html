@@ -39,10 +39,15 @@
                     {% endif %}
                 </td>
                 <td class="actions-column">
+                    <form action="{{ url_for('cartridge_actions', cartridge_id=cartridge.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-warning btn-sm">Історія дій</button>
+                    </form>
                     <a href="{{ url_for('edit_cartridge', cartridge_id=cartridge.id) }}" class="btn btn-info btn-sm">Редагувати</a>
                     <form action="{{ url_for('delete_cartridge', cartridge_id=cartridge.id) }}" method="POST" class="d-inline">
                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені?')">Видалити</button>
                     </form>
+
+<!-- тут це не потрібно, але тимчасово хай побуде.
                     <form action="{{ url_for('send_to_refill', cartridge_id=cartridge.id) }}" method="POST" class="d-inline send-to-refill">
                         <select name="exec_dept_id" class="form-select d-inline w-auto">
                             {% for dept in RefillDept.query.filter_by(is_exec=1).all() %}
@@ -52,6 +57,7 @@
                         <input type="text" name="parcel_track" class="form-control d-inline w-auto" placeholder="Трек-номер" maxlength="13">
                         <button type="submit" class="btn btn-warning btn-sm">На заправку</button>
                     </form>
+-->
                 </td>
             </tr>
             {% endfor %}

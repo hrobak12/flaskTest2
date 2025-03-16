@@ -57,6 +57,7 @@ class Cartridges(db.Model):
 class CartridgeStatus(db.Model):
     __tablename__ = "cartrg_status"
     id: Mapped[int] = mapped_column(primary_key=True)
+    cartridge_id = mapped_column(ForeignKey(Cartridges.id))
     status: Mapped[int] = mapped_column(Integer, server_default=literal(0))
     date_ofchange: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
     parcel_track: Mapped[str] = mapped_column(String(13), nullable=True)

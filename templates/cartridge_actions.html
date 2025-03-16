@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Історія дій з картриджем{% endblock %}
+{% block content %}
+    <h1>Історія дій з картриджем "{{ cartridge.cartridge_model|default('Невідома модель', true) }} ({{ cartridge.serial_num }})"</h1>
+    <div class="mb-3">
+        <a href="{{ url_for('cartridges') }}" class="btn btn-secondary">Назад</a>
+    </div>
+    <div style="max-height: 400px; overflow-y: auto;">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Статус</th>
+                    <th>Дата зміни</th>
+                    <th>Трек-номер</th>
+                    <th>Відділ</th>
+                    <th>Оновив</th>
+                    <th>Час оновлення</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for status in statuses %}
+                <tr>
+                    <td>{{ status.id }}</td>
+                    <td>
+                        {% set status_dict = {0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений'} %}
+                        {{ status_dict[status.status] }}
+                    </td>
+                    <td>{{ status.date_ofchange.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ status.parcel_track or 'Немає' }}</td>
+                    <td>{{ RefillDept.query.get(status.exec_dept).deptname if status.exec_dept else 'Не вказано' }}</td>
+                    <td>{{ User.query.get(status.user_updated).username if status.user_updated else 'Не вказано' }}</td>
+                    <td>{{ status.time_updated.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

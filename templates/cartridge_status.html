@@ -27,14 +27,14 @@
             {% for status in statuses %}
             <tr>
                 <td>{{ status.id }}</td>
-                <td>{{ Cartridges.query.get(status.id).serial_num }}</td>
+                <td>{{ Cartridges.query.get(status.cartridge_id).serial_num if status.cartridge_id else 'Не вказано' }}</td>
                 <td>
                     {% set status_dict = {0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений'} %}
                     {{ status_dict[status.status] }}
                 </td>
                 <td>{{ status.date_ofchange.strftime('%Y-%m-%d %H:%M') }}</td>
                 <td>{{ status.parcel_track or 'Немає' }}</td>
-                <td>{{ RefillDept.query.get(status.exec_dept).deptname }}</td>
+                <td>{{ RefillDept.query.get(status.exec_dept).deptname if status.exec_dept else 'Не вказано' }}</td>
                 <td>
                     <form action="{{ url_for('update_status', status_id=status.id) }}" method="POST" class="d-inline">
                         <select name="status" class="form-select d-inline w-auto">

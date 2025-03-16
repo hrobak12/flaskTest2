@@ -205,8 +205,21 @@ def delete_printer_model(model_id):
 @login_required
 def equipments():
     search = request.args.get('search', '')
-    equipments = CustomerEquipment.query.filter(CustomerEquipment.serial_num.ilike(f'%{search}%')).all()
-    return render_template('equipments.html', RefillDept=RefillDept, PrinterModel=PrinterModel, equipments=equipments, search=search)
+    page = request.args.get('page', 1, type=int)  # Отримуємо номер сторінки з URL
+    per_page = 10  # Кількість записів на сторінці (можете змінити)
+
+    # Базовий запит із фільтром пошуку
+    query = CustomerEquipment.query.filter(CustomerEquipment.serial_num.ilike(f'%{search}%'))
+    # Додаємо пагінацію
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    equipments = pagination.items  # Обладнання на поточній сторінці
+
+    return render_template('equipments.html',
+                           RefillDept=RefillDept,
+                           PrinterModel=PrinterModel,
+                           equipments=equipments,
+                           search=search,
+                           pagination=pagination)
 
 @app.route('/add_equipment', methods=['GET', 'POST'])
 @admin_required
@@ -339,6 +352,19 @@ def delete_cartridge(cartridge_id):
     flash('Картридж видалено!')
     return redirect(url_for('cartridges'))
 
+
+@app.route('/cartridge_actions/<int:cartridge_id>', methods=['GET', 'POST'])
+@login_required
+def cartridge_actions(cartridge_id):
+    cartridge = Cartridges.query.get_or_404(cartridge_id)
+    statuses = CartridgeStatus.query.filter_by(cartridge_id=cartridge_id).order_by(CartridgeStatus.date_ofchange.desc()).all()
+    return render_template('cartridge_actions.html',
+                          cartridge=cartridge,
+                          statuses=statuses,
+                          Cartridges=Cartridges,
+                          PrinterModel=PrinterModel,
+                          RefillDept=RefillDept)
+
 @app.route('/send_to_refill/<int:cartridge_id>', methods=['POST'])
 @login_required
 def send_to_refill(cartridge_id):
@@ -363,19 +389,22 @@ def send_to_refill(cartridge_id):
     flash('Картридж відправлено на заправку!')
     return redirect(url_for('cartridges'))
 
-# Управління статусами картриджів
+## Управління статусами картриджів
 @app.route('/cartridge_status')
 @login_required
 def cartridge_status():
     search = request.args.get('search', '')
-    statuses = CartridgeStatus.query.join(Cartridges, Cartridges.id == CartridgeStatus.id).filter(
-        Cartridges.serial_num.ilike(f'%{search}%')
-    ).all()
+    if search:
+        statuses = CartridgeStatus.query.join(Cartridges, Cartridges.id == CartridgeStatus.cartridge_id).filter(
+            Cartridges.serial_num.ilike(f'%{search}%')
+        ).all()
+    else:
+        statuses = CartridgeStatus.query.all()
     return render_template('cartridge_status.html',
                            statuses=statuses,
                            search=search,
-                           Cartridges=Cartridges,  # Додаємо модель Cartridges
-                           RefillDept=RefillDept)  # Додаємо модель RefillDept
+                           Cartridges=Cartridges,  # Залишаємо для сумісності
+                           RefillDept=RefillDept)  # Залишаємо для сумісності
 
 @app.route('/update_status/<int:status_id>', methods=['POST'])
 @login_required
@@ -384,6 +413,7 @@ def update_status(status_id):
     new_status = int(request.form['status'])
     status.status = new_status
     status.user_updated = current_user.id
+    status.time_updated = datetime.now()  # Оновлюємо час зміни
     event = EventLog(
         table_name='cartrg_status',
         event_type=2,  # Оновлення статусу
