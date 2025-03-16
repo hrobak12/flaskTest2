@@ -16,7 +16,11 @@
             <select class="form-select" id="in_printer" name="in_printer">
                 <option value="">Немає</option>
                 {% for equip in equipments %}
-                    <option value="{{ equip.id }}">{{ equip.serial_num }} ({{ PrinterModel.query.get(equip.print_model).model_name }})</option>
+                    {% set model = PrinterModel.query.get(equip.print_model) %}
+                    {% set dept = RefillDept.query.get(equip.print_dept) %}
+                    <option value="{{ equip.id }}">
+                        {{ model.model_name }} ({{ dept.deptname }})
+                    </option>
                 {% endfor %}
             </select>
         </div>

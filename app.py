@@ -217,8 +217,8 @@ def add_equipment():
         print_dept = request.form['print_dept']
         serial_num = request.form['serial_num']
         inventory_num = request.form['inventory_num']
-        if CustomerEquipment.query.filter_by(serial_num=serial_num).first():
-            flash('Обладнання з таким серійним номером уже існує!')
+        if CustomerEquipment.query.filter_by(inventory_num=inventory_num).first():
+            flash('Обладнання з таким інвентарним номером уже існує!')
             return render_template('add_equipment.html', models=PrinterModel.query.all(), depts=RefillDept.query.all())
         equip = CustomerEquipment(
             print_model=print_model,
@@ -241,15 +241,20 @@ def add_equipment():
 def edit_equipment(equip_id):
     equip = CustomerEquipment.query.get_or_404(equip_id)
     if request.method == 'POST':
-        equip.print_model = request.form['print_model']
-        equip.print_dept = request.form['print_dept']
+        print_model = request.form['print_model']
+        print_dept = request.form['print_dept']
         serial_num = request.form['serial_num']
-        if CustomerEquipment.query.filter(CustomerEquipment.serial_num == serial_num, CustomerEquipment.id != equip_id).first():
-            flash('Обладнання з таким серійним номером уже існує!')
+        inventory_num = request.form['inventory_num']
+        if CustomerEquipment.query.filter(CustomerEquipment.inventory_num == inventory_num, CustomerEquipment.id != equip_id).first():
+            flash('Обладнання з таким інвентарним номером уже існує!')
             return render_template('edit_equipment.html', equip=equip, models=PrinterModel.query.all(), depts=RefillDept.query.all())
+
+        equip.print_model = print_model
+        equip.print_dept = print_dept
         equip.serial_num = serial_num
-        equip.inventory_num = request.form['inventory_num']
+        equip.inventory_num = inventory_num
         equip.user_updated = current_user.id
+
         db.session.commit()
         flash('Обладнання оновлено!')
         return redirect(url_for('equipments'))
@@ -288,7 +293,7 @@ def add_cartridge():
         serial_num = request.form['serial_num']
         if Cartridges.query.filter_by(serial_num=serial_num).first():
             flash('Картридж із таким серійним номером уже існує!')
-            return render_template('add_cartridge.html', equipments=CustomerEquipment.query.all())
+            return render_template('add_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, equipments=CustomerEquipment.query.all())
         in_printer = request.form['in_printer'] or None
         cartridge_model = request.form['cartridge_model']  # Текстове поле
         cartridge = Cartridges(
@@ -302,7 +307,7 @@ def add_cartridge():
         flash('Картридж додано!')
         return redirect(url_for('cartridges'))
     equipments = CustomerEquipment.query.all()
-    return render_template('add_cartridge.html', PrinterModel = PrinterModel, equipments=equipments)
+    return render_template('add_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, equipments=equipments)
 
 @app.route('/edit_cartridge/<int:cartridge_id>', methods=['GET', 'POST'])
 @login_required
@@ -313,7 +318,7 @@ def edit_cartridge(cartridge_id):
         serial_num = request.form['serial_num']
         if Cartridges.query.filter(Cartridges.serial_num == serial_num, Cartridges.id != cartridge_id).first():
             flash('Картридж із таким серійним номером уже існує!')
-            return render_template('edit_cartridge.html', cartridge=cartridge, equipments=CustomerEquipment.query.all())
+            return render_template('edit_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, cartridge=cartridge, equipments=CustomerEquipment.query.all())
         cartridge.serial_num = serial_num
         cartridge.in_printer = request.form['in_printer'] or None
         cartridge.cartridge_model = request.form['cartridge_model'] or None  # Текстове поле
@@ -455,17 +460,17 @@ def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     if request.method == 'POST':
         username = request.form['username']
-        humanname = request.form['humanname']
-        role = request.form['role']
-        password = request.form['password']
         if User.query.filter(User.username == username, User.id != user_id).first():
-            flash('Користувач із таким логіном уже існує!')
+            flash('Користувач із таким іменем уже існує!')
             return render_template('edit_user.html', user=user)
         user.username = username
-        user.humanname = humanname
-        user.role = role
-        if password:
-            user.password = hash_password(password)
+        if request.form['password']:  # Оновлюємо пароль лише якщо введено
+            user.password = bcrypt.hashpw(request.form['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        user.humanname = request.form['humanname']
+        user.role = request.form['role']
+        # Виправлення: явно перевіряємо наявність 'active'
+        user.active = 'active' in request.form  # True якщо прапорець увімкнено, False якщо знято
+        user.time_updated = datetime.now()
         db.session.commit()
         flash('Користувача оновлено!')
         return redirect(url_for('users'))
