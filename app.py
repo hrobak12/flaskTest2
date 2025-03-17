@@ -500,7 +500,7 @@ def event_log():
 def users():
     search = request.args.get('search', '')
     users_list = User.query.filter(User.username.ilike(f'%{search}%')).all()
-    return render_template('users.html', users=users_list, RefillDept=RefillDept, search=search)
+    return render_template('users.html', users=users_list, search=search)
 
 @app.route('/add_user', methods=['GET', 'POST'])
 @admin_required
@@ -587,6 +587,11 @@ def add_cartridge_event():
 
     return jsonify({'success': True})
 
+
+@app.route('/processCartridge')
+@login_required
+def processCartridge():
+    return render_template('processCartridge.html', user=current_user, RefillDept=RefillDept)
 
 @app.route('/check_cartridge', methods=['POST'])
 @login_required

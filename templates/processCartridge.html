@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Обробка картриджів{% endblock %}
+{% block content %}
+    <h1>Обробка картриджів</h1>
+    <h2>Натисніть F2 для обробки картриджів</h2>
+
+
+    <!-- Модальне вікно для обробки -->
+    <div class="modal fade" id="processModal" tabindex="-1" aria-labelledby="processModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="processModalLabel">Додати подію для картриджа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="processForm">
+                        <div class="mb-3">
+                            <label for="serial_num" class="form-label">Серійний номер</label>
+                            <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Введіть або відскануйте" required autofocus>
+                        </div>
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Статус</label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="0">Порожній</option>
+                                <option value="1">Очікує заправки</option>
+                                <option value="2">Заправлений</option>
+                                <option value="3">В дорозі</option>
+                                <option value="4">Списаний</option>
+                                <option value="5">Одноразовий</option>
+                                <option value="6">На зберіганні</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="date_ofchange" class="form-label">Дата</label>
+                            <input type="datetime-local" class="form-control" id="date_ofchange" name="date_ofchange">
+                        </div>
+                        <div class="mb-3">
+                            <label for="exec_dept" class="form-label">Відділ (необов’язково)</label>
+                            <select class="form-select" id="exec_dept" name="exec_dept">
+                                <option value="">Не вказано</option>
+                                {% for dept in RefillDept.query.all() %}
+                                    <option value="{{ dept.id }}">{{ dept.deptname }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="parcel_track" class="form-label">Трек-номер (необов’язково)</label>
+                            <input type="text" class="form-control" id="parcel_track" name="parcel_track" maxlength="13" placeholder="Трек-номер">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                    <button type="button" class="btn btn-primary" id="confirmProcess">Підтвердити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Встановлення поточної дати в поле date_ofchange
+        window.addEventListener('DOMContentLoaded', (event) => {
+            const now = new Date();
+            const formattedDate = now.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+            document.getElementById('date_ofchange').value = formattedDate;
+        });
+
+        // Відкриття модального вікна через меню або F2
+        const processModal = new bootstrap.Modal(document.getElementById('processModal'));
+        document.getElementById('processCartridge').addEventListener('click', (e) => {
+            e.preventDefault(); // Скасовуємо стандартну поведінку посилання
+            processModal.show(); // Відкриваємо модальне вікно
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F2') {
+                e.preventDefault();
+                processModal.show();
+            }
+        });
+
+        // Фокус на поле "Серійний номер" при показі модального вікна
+        document.getElementById('processModal').addEventListener('shown.bs.modal', () => {
+            document.getElementById('serial_num').focus();
+        });
+
+        // Закриття через ESC уже вбудовано в Bootstrap Modal, але підтверджуємо
+        document.getElementById('processModal').addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                processModal.hide();
+            }
+        });
+
+        // Підтвердження через Enter або кнопку
+        document.getElementById('confirmProcess').addEventListener('click', submitForm);
+        document.getElementById('processForm').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitForm();
+            }
+        });
+
+        // Новий обробник: перевірка серійного номера при втраті фокусу
+        document.getElementById('serial_num').addEventListener('blur', (e) => {
+            const serialNum = e.target.value.trim();
+            if (serialNum) {
+                // Прапорець для відстеження стану модального вікна
+                let isModalOpen = processModal._isShown;
+
+                fetch('/check_cartridge', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ serial_num: serialNum })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Перевіряємо стан модального вікна на момент отримання відповіді
+                    if (isModalOpen) {
+                        if (data.success) {
+                            const latestStatus = data.latest_status;
+                            if (latestStatus) {
+                                document.getElementById('status').value = latestStatus.status || '0';
+                                document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
+                                document.getElementById('exec_dept').value = latestStatus.exec_dept || '';
+                                document.getElementById('parcel_track').value = latestStatus.parcel_track || '';
+                            }
+                        } else {
+                            // Анімація заголовка "Серійний номер"
+                            const label = document.querySelector('label[for="serial_num"]');
+                            label.style.transition = 'color 0.3s ease'; // Плавний перехід
+                            label.style.color = 'red'; // Червоний на пів секунди
+                            setTimeout(() => {
+                                label.style.color = ''; // Повернення до нормального кольору
+                            }, 500); // 500 мс = 0.5 секунди
+                            document.getElementById('serial_num').focus();
+                            document.getElementById('serial_num').select();
+                        }
+                    }
+                })
+                .catch(error => {
+                    // Перевіряємо стан модального вікна на момент помилки
+                    if (isModalOpen) {
+                        // Анімація заголовка при помилці
+                        const label = document.querySelector('label[for="serial_num"]');
+                        label.style.transition = 'color 0.3s ease';
+                        label.style.color = '#dc3545';
+                        setTimeout(() => {
+                            label.style.color = '';
+                        }, 500);
+                        document.getElementById('serial_num').focus();
+                        document.getElementById('serial_num').select();
+                    }
+                });
+            }
+        });
+
+        // Оновлюємо прапорець при закритті модального вікна
+        document.getElementById('processModal').addEventListener('hidden.bs.modal', () => {
+            processModal._isShown = false;
+        });
+
+        // Відправка форми через AJAX
+        function submitForm() {
+            const formData = new FormData(document.getElementById('processForm'));
+            fetch('/add_cartridge_event', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Подію додано!');
+                    processModal.hide();
+                    document.getElementById('processForm').reset();
+                    document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
+                } else {
+                    alert('Помилка: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Помилка при відправці: ' + error);
+            });
+        }
+    </script>
+
+{% endblock %}
