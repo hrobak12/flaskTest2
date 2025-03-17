@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog
 from datetime import datetime
 import bcrypt
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
@@ -50,7 +51,7 @@ with app.app_context():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html', user=current_user)
+    return render_template('index.html', user=current_user, RefillDept=RefillDept)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -499,7 +500,7 @@ def event_log():
 def users():
     search = request.args.get('search', '')
     users_list = User.query.filter(User.username.ilike(f'%{search}%')).all()
-    return render_template('users.html', users=users_list, search=search)
+    return render_template('users.html', users=users_list, RefillDept=RefillDept, search=search)
 
 @app.route('/add_user', methods=['GET', 'POST'])
 @admin_required
@@ -557,6 +558,59 @@ def delete_user(user_id):
     flash('Користувача видалено!')
     return redirect(url_for('users'))
 
+@app.route('/add_cartridge_event', methods=['POST'])
+@login_required
+def add_cartridge_event():
+    serial_num = request.form.get('serial_num')
+    status = request.form.get('status')
+    date_ofchange = request.form.get('date_ofchange')
+    exec_dept = request.form.get('exec_dept') or None
+    parcel_track = request.form.get('parcel_track') or None
+
+    # Перевірка наявності картриджа
+    cartridge = Cartridges.query.filter_by(serial_num=serial_num).first()
+    if not cartridge:
+        return jsonify({'success': False, 'message': 'Картридж із таким серійним номером не знайдено!'})
+
+    # Додавання події в CartridgeStatus
+    new_status = CartridgeStatus(
+        cartridge_id=cartridge.id,
+        status=int(status),
+        date_ofchange=datetime.strptime(date_ofchange, '%Y-%m-%dT%H:%M'),
+        parcel_track=parcel_track,
+        exec_dept=exec_dept,
+        user_updated=current_user.id,
+        time_updated=datetime.now()
+    )
+    db.session.add(new_status)
+    db.session.commit()
+
+    return jsonify({'success': True})
+
+
+@app.route('/check_cartridge', methods=['POST'])
+@login_required
+def check_cartridge():
+    data = request.get_json()
+    serial_num = data.get('serial_num')
+
+    # Перевірка наявності картриджа
+    cartridge = Cartridges.query.filter_by(serial_num=serial_num).first()
+    if not cartridge:
+        return jsonify({'success': False, 'message': 'Картридж не знайдено!'})
+
+    # Отримуємо останній статус із CartridgeStatus
+    latest_status = CartridgeStatus.query.filter_by(cartridge_id=cartridge.id) \
+        .order_by(CartridgeStatus.date_ofchange.desc()).first()
+
+    return jsonify({
+        'success': True,
+        'latest_status': {
+            'status': latest_status.status if latest_status else 0,
+            'exec_dept': latest_status.exec_dept if latest_status else None,
+            'parcel_track': latest_status.parcel_track if latest_status else None
+        }
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
