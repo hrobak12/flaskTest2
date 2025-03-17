@@ -331,6 +331,7 @@ def add_cartridge():
     equipments = CustomerEquipment.query.all()
     return render_template('add_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, equipments=equipments)
 
+
 @app.route('/edit_cartridge/<int:cartridge_id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -338,18 +339,45 @@ def edit_cartridge(cartridge_id):
     cartridge = Cartridges.query.get_or_404(cartridge_id)
     if request.method == 'POST':
         serial_num = request.form['serial_num']
+        # Перевірка унікальності серійного номера
         if Cartridges.query.filter(Cartridges.serial_num == serial_num, Cartridges.id != cartridge_id).first():
             flash('Картридж із таким серійним номером уже існує!')
-            return render_template('edit_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, cartridge=cartridge, equipments=CustomerEquipment.query.all())
+            return render_template('edit_cartridge.html',
+                                   RefillDept=RefillDept,
+                                   PrinterModel=PrinterModel,
+                                   cartridge=cartridge,
+                                   equipments=CustomerEquipment.query.all())
+
+        # Оновлення даних картриджа
         cartridge.serial_num = serial_num
         cartridge.in_printer = request.form['in_printer'] or None
-        cartridge.cartridge_model = request.form['cartridge_model'] or None  # Текстове поле
+        cartridge.cartridge_model = request.form['cartridge_model'] or None
         cartridge.user_updated = current_user.id
+        cartridge.time_updated = datetime.now()
+
+        # Додавання нової події в CartridgeStatus (якщо вказано статус)
+        if 'status' in request.form and request.form['status']:
+            new_status = CartridgeStatus(
+                cartridge_id=cartridge.id,
+                status=int(request.form['status']),
+                parcel_track=request.form.get('parcel_track') or None,
+                exec_dept=request.form.get('exec_dept') or None,
+                user_updated=current_user.id,
+                date_ofchange=datetime.now(),
+                time_updated=datetime.now()
+            )
+            db.session.add(new_status)
+
         db.session.commit()
-        flash('Картридж оновлено!')
+        flash('Картридж оновлено та подію додано (якщо вказано статус)!')
         return redirect(url_for('cartridges'))
+
     equipments = CustomerEquipment.query.all()
-    return render_template('edit_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, cartridge=cartridge, equipments=equipments)
+    return render_template('edit_cartridge.html',
+                           RefillDept=RefillDept,
+                           PrinterModel=PrinterModel,
+                           cartridge=cartridge,
+                           equipments=equipments)
 
 @app.route('/delete_cartridge/<int:cartridge_id>', methods=['POST'])
 @login_required
@@ -372,7 +400,8 @@ def cartridge_actions(cartridge_id):
                           statuses=statuses,
                           Cartridges=Cartridges,
                           PrinterModel=PrinterModel,
-                          RefillDept=RefillDept)
+                          RefillDept=RefillDept,
+                          User=User)
 
 @app.route('/send_to_refill/<int:cartridge_id>', methods=['POST'])
 @login_required

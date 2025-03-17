@@ -29,7 +29,7 @@
                 <td>{{ status.id }}</td>
                 <td>{{ Cartridges.query.get(status.cartridge_id).serial_num if status.cartridge_id else 'Не вказано' }}</td>
                 <td>
-                    {% set status_dict = {0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений'} %}
+                    {% set status_dict = {0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений', 3: 'В дорозі', 4: 'Списаний', 5: 'Одноразовий', 6: 'На зберіганні'} %}
                     {{ status_dict[status.status] }}
                 </td>
                 <td>{{ status.date_ofchange.strftime('%Y-%m-%d %H:%M') }}</td>
@@ -41,6 +41,10 @@
                             <option value="0" {% if status.status == 0 %}selected{% endif %}>Порожній</option>
                             <option value="1" {% if status.status == 1 %}selected{% endif %}>Очікує заправки</option>
                             <option value="2" {% if status.status == 2 %}selected{% endif %}>Заправлений</option>
+                            <option value="4" {% if status.status == 0 %}selected{% endif %}>В дорозі</option>
+                            <option value="5" {% if status.status == 1 %}selected{% endif %}>Списаний</option>
+                            <option value="6" {% if status.status == 2 %}selected{% endif %}>Одноразовий</option>
+                            <option value="7" {% if status.status == 0 %}selected{% endif %}>На зберіганні</option>
                         </select>
                         <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
                     </form>
