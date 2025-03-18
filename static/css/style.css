@@ -29,3 +29,18 @@ body {
     padding-left: 10px;
     padding-right: 10px;
 }
+
+/*CSS keyframes для створення ефекту подвійного мигання*/
+
+@keyframes doubleBlink {
+    0% { color: inherit; }
+    20% { color: #dc3545; }
+    40% { color: inherit; }
+    60% { color: #dc3545; }
+    80% { color: inherit; }
+    100% { color: inherit; }
+}
+
+.double-blink {
+    animation: doubleBlink 1.2s ease;
+}

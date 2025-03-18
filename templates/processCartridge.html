@@ -4,7 +4,6 @@
     <h1>Обробка картриджів</h1>
     <h2>Натисніть F2 для обробки картриджів</h2>
 
-
     <!-- Модальне вікно для обробки -->
     <div class="modal fade" id="processModal" tabindex="-1" aria-labelledby="processModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -57,21 +56,22 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}
     <script>
         // Встановлення поточної дати в поле date_ofchange
         window.addEventListener('DOMContentLoaded', (event) => {
             const now = new Date();
-            const formattedDate = now.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+            const formattedDate = now.toISOString().slice(0, 16);
             document.getElementById('date_ofchange').value = formattedDate;
         });
 
         // Відкриття модального вікна через меню або F2
         const processModal = new bootstrap.Modal(document.getElementById('processModal'));
         document.getElementById('processCartridge').addEventListener('click', (e) => {
-            e.preventDefault(); // Скасовуємо стандартну поведінку посилання
-            processModal.show(); // Відкриваємо модальне вікно
+            e.preventDefault();
+            processModal.show();
         });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F2') {
@@ -101,13 +101,11 @@
             }
         });
 
-        // Новий обробник: перевірка серійного номера при втраті фокусу
+        // Перевірка серійного номера при втраті фокусу
         document.getElementById('serial_num').addEventListener('blur', (e) => {
             const serialNum = e.target.value.trim();
             if (serialNum) {
-                // Прапорець для відстеження стану модального вікна
                 let isModalOpen = processModal._isShown;
-
                 fetch('/check_cartridge', {
                     method: 'POST',
                     headers: {
@@ -117,7 +115,6 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    // Перевіряємо стан модального вікна на момент отримання відповіді
                     if (isModalOpen) {
                         if (data.success) {
                             const latestStatus = data.latest_status;
@@ -128,13 +125,14 @@
                                 document.getElementById('parcel_track').value = latestStatus.parcel_track || '';
                             }
                         } else {
-                            // Анімація заголовка "Серійний номер"
                             const label = document.querySelector('label[for="serial_num"]');
-                            label.style.transition = 'color 0.3s ease'; // Плавний перехід
-                            label.style.color = 'red'; // Червоний на пів секунди
+                            label.classList.add('double-blink');
+
+                            // Знімаємо клас після завершення анімації, щоб можна було повторити
                             setTimeout(() => {
-                                label.style.color = ''; // Повернення до нормального кольору
-                            }, 500); // 500 мс = 0.5 секунди
+                                label.classList.remove('double-blink');
+                            }, 1200); // Тривалість анімації
+
                             document.getElementById('serial_num').focus();
                             document.getElementById('serial_num').select();
                         }
@@ -143,13 +141,14 @@
                 .catch(error => {
                     // Перевіряємо стан модального вікна на момент помилки
                     if (isModalOpen) {
-                        // Анімація заголовка при помилці
                         const label = document.querySelector('label[for="serial_num"]');
-                        label.style.transition = 'color 0.3s ease';
-                        label.style.color = '#dc3545';
+                        label.classList.add('double-blink');
+
+                        // Знімаємо клас після завершення анімації, щоб можна було повторити
                         setTimeout(() => {
-                            label.style.color = '';
-                        }, 500);
+                            label.classList.remove('double-blink');
+                        }, 1200); // Тривалість анімації
+
                         document.getElementById('serial_num').focus();
                         document.getElementById('serial_num').select();
                     }
@@ -185,5 +184,4 @@
             });
         }
     </script>
-
 {% endblock %}
