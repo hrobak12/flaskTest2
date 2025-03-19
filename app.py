@@ -617,5 +617,95 @@ def check_cartridge():
         }
     })
 
+#динамічний фільтр картриджів
+@app.route('/api/cartridges', methods=['GET'])
+@login_required
+def api_cartridges():
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    query = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    cartridges_data = []
+    for cartridge in pagination.items:
+        in_printer_info = None
+        if cartridge.in_printer:
+            equipment = CustomerEquipment.query.get(cartridge.in_printer)
+            if equipment:
+                printer_model = PrinterModel.query.get(equipment.print_model)
+                dept = RefillDept.query.get(equipment.print_dept)
+                in_printer_info = f"{printer_model.model_name} ({dept.deptname})"
+
+        cartridges_data.append({
+            'id': cartridge.id,
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': cartridge.cartridge_model,
+            'in_printer_info': in_printer_info
+        })
+
+    pagination_data = {
+        'has_prev': pagination.has_prev,
+        'has_next': pagination.has_next,
+        'prev_num': pagination.prev_num,
+        'next_num': pagination.next_num,
+        'current_page': pagination.page,
+        'pages': list(pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1)),
+        'search': search
+    }
+
+    return jsonify({
+        'cartridges': cartridges_data,
+        'pagination': pagination_data
+    })
+
+@app.route('/api/equipments', methods=['GET'])
+@login_required
+def api_equipments():
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    # Фільтруємо по назві моделі через join із PrinterModel
+    if search:
+        query = CustomerEquipment.query.join(PrinterModel, CustomerEquipment.print_model == PrinterModel.id)\
+                                       .filter(PrinterModel.model_name.ilike(f'%{search}%'))
+    else:
+        query = CustomerEquipment.query
+
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    equipments_data = []
+    for equip in pagination.items:
+        # Використовуємо db.session.get замість query.get
+        model = db.session.get(PrinterModel, equip.print_model) if equip.print_model else None
+        dept = db.session.get(RefillDept, equip.print_dept) if equip.print_dept else None
+        model_name = model.model_name if model else None
+        dept_name = dept.deptname if dept else None
+        equipments_data.append({
+            'id': equip.id,
+            'model_name': model_name,
+            'dept_name': dept_name,
+            'serial_num': equip.serial_num,
+            'inventory_num': equip.inventory_num
+        })
+
+    pagination_data = {
+        'has_prev': pagination.has_prev,
+        'has_next': pagination.has_next,
+        'prev_num': pagination.prev_num,
+        'next_num': pagination.next_num,
+        'current_page': pagination.page,
+        'pages': list(pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1)),
+        'search': search
+    }
+
+    return jsonify({
+        'equipments': equipments_data,
+        'pagination': pagination_data
+    })
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

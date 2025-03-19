@@ -2,17 +2,19 @@
 {% block title %}Картриджі{% endblock %}
 {% block content %}
     <h1>Список картриджів</h1>
-    <form method="GET" class="mb-3">
-        <div class="input-group">
-            <input type="text" name="search" class="form-control" placeholder="Пошук за серійним номером" value="{{ search }}">
-            <button type="submit" class="btn btn-primary">Шукати</button>
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <input type="text" id="search" class="form-control" placeholder="Пошук за серійним номером" value="{{ search }}" style="max-width: 400px;">
+            <button id="clear-search" class="btn btn-danger btn-sm ms-2" title="Очистити пошук">
+                <span>×</span>
+            </button>
         </div>
-    </form>
-    <div class="mb-3">
-        <a href="{{ url_for('add_cartridge') }}" class="btn btn-success">Додати картридж</a>
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+        <div>
+            <a href="{{ url_for('add_cartridge') }}" class="btn btn-success me-2">Додати картридж</a>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+        </div>
     </div>
-    <table class="table table-striped">
+    <table class="table table-striped" id="cartridge-table">
         <thead>
             <tr>
                 <th>ID</th>
@@ -22,7 +24,7 @@
                 <th>Дії</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="cartridge-table-body">
             {% for cartridge in cartridges %}
             <tr>
                 <td>{{ cartridge.id }}</td>
@@ -46,19 +48,6 @@
                     <form action="{{ url_for('delete_cartridge', cartridge_id=cartridge.id) }}" method="POST" class="d-inline">
                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені?')">Видалити</button>
                     </form>
-
-                    <!-- Тут це не потрібно, але тимчасово хай побуде -->
-                    <!--
-                    <form action="{{ url_for('send_to_refill', cartridge_id=cartridge.id) }}" method="POST" class="d-inline send-to-refill">
-                        <select name="exec_dept_id" class="form-select d-inline w-auto">
-                            {% for dept in RefillDept.query.filter_by(is_exec=1).all() %}
-                                <option value="{{ dept.id }}">{{ dept.deptname }}</option>
-                            {% endfor %}
-                        </select>
-                        <input type="text" name="parcel_track" class="form-control d-inline w-auto" placeholder="Трек-номер" maxlength="13">
-                        <button type="submit" class="btn btn-warning btn-sm">На заправку</button>
-                    </form>
-                    -->
                 </td>
             </tr>
             {% endfor %}
@@ -67,69 +56,125 @@
 
     <!-- Пагінація -->
     <nav aria-label="Page navigation">
-        <ul class="pagination justify-content-center">
-            {% if pagination.has_prev %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('cartridges', page=pagination.prev_num, search=search) }}">Попередня</a>
-                </li>
-            {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link">Попередня</span>
-                </li>
-            {% endif %}
-
-            {% for page_num in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
-                {% if page_num %}
-                    {% if page_num == pagination.page %}
-                        <li class="page-item active">
-                            <span class="page-link">{{ page_num }}</span>
-                        </li>
-                    {% else %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('cartridges', page=page_num, search=search) }}">{{ page_num }}</a>
-                        </li>
-                    {% endif %}
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                {% endif %}
-            {% endfor %}
-
-            {% if pagination.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('cartridges', page=pagination.next_num, search=search) }}">Наступна</a>
-                </li>
-            {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link">Наступна</span>
-                </li>
-            {% endif %}
+        <ul class="pagination justify-content-center" id="pagination">
+            <!-- Пагінація оновлюється через JS -->
         </ul>
     </nav>
 
     <style>
         .cartridge-model, .in-printer {
-            max-width: 200px; /* Обмежуємо ширину колонок */
-            white-space: nowrap; /* Запобігаємо перенесенню тексту */
-            overflow: hidden; /* Ховаємо зайвий текст */
-            text-overflow: ellipsis; /* Додаємо три крапки */
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-
         .actions-column {
-            white-space: nowrap; /* Усі елементи в один рядок */
+            white-space: nowrap;
             vertical-align: middle;
         }
-
-        .send-to-refill {
-            display: inline-flex; /* Вирівнюємо елементи форми горизонтально */
-            align-items: center; /* Вирівнювання по вертикалі */
-            gap: 5px; /* Відстань між елементами */
-        }
-
-        .send-to-refill .form-control,
-        .send-to-refill .form-select {
-            margin: 0; /* Прибираємо стандартні відступи */
+        #clear-search {
+            padding: 0.25rem 0.5rem; /* Відступи як у btn-sm */
         }
     </style>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        let timeout;
+        const searchInput = document.getElementById('search');
+        const clearSearchBtn = document.getElementById('clear-search');
+
+        // Обробка введення з debounce
+        searchInput.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const searchValue = this.value.trim();
+            timeout = setTimeout(() => {
+                fetchCartridges(searchValue, 1);
+            }, 300);
+        });
+
+        // Обробка натискання кнопки очистки
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            fetchCartridges('', 1);
+        });
+
+        // Очищення поля вводу при натисканні Esc
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' || event.keyCode === 27) {
+                searchInput.value = '';
+                fetchCartridges('', 1); //для cartridges.html
+            }
+        });
+
+        function fetchCartridges(search, page) {
+            fetch(`/api/cartridges?search=${encodeURIComponent(search)}&page=${page}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateTable(data.cartridges);
+                updatePagination(data.pagination);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function updateTable(cartridges) {
+            const tbody = document.getElementById('cartridge-table-body');
+            tbody.innerHTML = '';
+            cartridges.forEach(cartridge => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${cartridge.id}</td>
+                    <td>${cartridge.serial_num}</td>
+                    <td class="cartridge-model" title="${cartridge.cartridge_model || 'Не вказано'}">
+                        ${cartridge.cartridge_model || 'Не вказано'}
+                    </td>
+                    <td class="in-printer" title="${cartridge.in_printer_info || 'Немає'}">
+                        ${cartridge.in_printer_info || 'Немає'}
+                    </td>
+                    <td class="actions-column">
+                        <form action="/cartridge_actions/${cartridge.id}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-warning btn-sm">Історія дій</button>
+                        </form>
+                        <a href="/edit_cartridge/${cartridge.id}" class="btn btn-info btn-sm">Редагувати</a>
+                        <form action="/delete_cartridge/${cartridge.id}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені?')">Видалити</button>
+                        </form>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updatePagination(pagination) {
+            const paginationUl = document.getElementById('pagination');
+            paginationUl.innerHTML = '';
+
+            if (pagination.has_prev) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${pagination.prev_num}); return false;">Попередня</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Попередня</span></li>`;
+            }
+
+            pagination.pages.forEach(page => {
+                if (page === null) {
+                    paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                } else if (page === pagination.current_page) {
+                    paginationUl.innerHTML += `<li class="page-item active"><span class="page-link">${page}</span></li>`;
+                } else {
+                    paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${page}); return false;">${page}</a></li>`;
+                }
+            });
+
+            if (pagination.has_next) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${pagination.next_num}); return false;">Наступна</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Наступна</span></li>`;
+            }
+        }
+    </script>
 {% endblock %}
