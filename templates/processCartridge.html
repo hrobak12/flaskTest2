@@ -56,18 +56,164 @@
             </div>
         </div>
     </div>
+
+    <!-- Таблиця картриджів "В дорозі" -->
+    <div class="mt-5">
+        <h3>Картриджі в дорозі</h3>
+        <div class="card">
+            <div class="card-body p-0">
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-striped mb-0" id="in-transit-table">
+                        <thead class="sticky-header">
+                            <tr>
+                                <th class="col-id">ID</th>
+                                <th class="col-serial">Серійний номер</th>
+                                <th class="col-model">Модель картриджа</th>
+                                <th class="col-date">Дата зміни</th>
+                                <th class="col-dept">Відділ</th>
+                                <th class="col-track">Трек-номер</th>
+                            </tr>
+                        </thead>
+                        <tbody id="in-transit-table-body">
+                            <!-- Дані завантажуються через JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Таблиця картриджів "На зберіганні" -->
+    <div class="mt-4">
+        <h3>Картриджі на зберіганні</h3>
+        <div class="card">
+            <div class="card-body p-0">
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-striped mb-0" id="in-storage-table">
+                        <thead class="sticky-header">
+                            <tr>
+                                <th class="col-id">ID</th>
+                                <th class="col-serial">Серійний номер</th>
+                                <th class="col-model">Модель картриджа</th>
+                                <th class="col-date">Дата зміни</th>
+                                <th class="col-dept">Відділ</th>
+                                <th class="col-track">Трек-номер</th>
+                            </tr>
+                        </thead>
+                        <tbody id="in-storage-table-body">
+                            <!-- Дані завантажуються через JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Додаємо стилі -->
+    <style>
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 1;
+        }
+        .sticky-header th {
+            border-bottom: 2px solid #dee2e6;
+        }
+        /* Фіксовані ширини колонок */
+        .col-id {
+            width: 5%;
+        }
+        .col-serial {
+            width: 20%;
+        }
+        .col-model {
+            width: 20%;
+        }
+        .col-date {
+            width: 15%;
+        }
+        .col-dept {
+            width: 20%;
+        }
+        .col-track {
+            width: 20%;
+        }
+    </style>
 {% endblock %}
 
 {% block scripts %}
     <script>
-        // Встановлення поточної дати в поле date_ofchange
         window.addEventListener('DOMContentLoaded', (event) => {
             const now = new Date();
             const formattedDate = now.toISOString().slice(0, 16);
             document.getElementById('date_ofchange').value = formattedDate;
+            fetchInTransitCartridges();
+            fetchInStorageCartridges();
         });
 
-        // Відкриття модального вікна через меню або F2
+        function fetchInTransitCartridges() {
+            fetch('/api/in_transit_cartridges', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateInTransitTable(data.cartridges);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function updateInTransitTable(cartridges) {
+            const tbody = document.getElementById('in-transit-table-body');
+            tbody.innerHTML = '';
+            cartridges.forEach(cartridge => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${cartridge.id}</td>
+                    <td>${cartridge.serial_num}</td>
+                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
+                    <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
+                    <td>${cartridge.dept_name || 'Не вказано'}</td>
+                    <td>${cartridge.parcel_track || 'Не вказано'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function fetchInStorageCartridges() {
+            fetch('/api/in_storage_cartridges', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateInStorageTable(data.cartridges);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function updateInStorageTable(cartridges) {
+            const tbody = document.getElementById('in-storage-table-body');
+            tbody.innerHTML = '';
+            cartridges.forEach(cartridge => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${cartridge.id}</td>
+                    <td>${cartridge.serial_num}</td>
+                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
+                    <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
+                    <td>${cartridge.dept_name || 'Не вказано'}</td>
+                    <td>${cartridge.parcel_track || 'Не вказано'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
         const processModal = new bootstrap.Modal(document.getElementById('processModal'));
         document.getElementById('processCartridge').addEventListener('click', (e) => {
             e.preventDefault();
@@ -80,19 +226,16 @@
             }
         });
 
-        // Фокус на поле "Серійний номер" при показі модального вікна
         document.getElementById('processModal').addEventListener('shown.bs.modal', () => {
             document.getElementById('serial_num').focus();
         });
 
-        // Закриття через ESC уже вбудовано в Bootstrap Modal, але підтверджуємо
         document.getElementById('processModal').addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 processModal.hide();
             }
         });
 
-        // Підтвердження через Enter або кнопку
         document.getElementById('confirmProcess').addEventListener('click', submitForm);
         document.getElementById('processForm').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -101,7 +244,6 @@
             }
         });
 
-        // Перевірка серійного номера при втраті фокусу
         document.getElementById('serial_num').addEventListener('blur', (e) => {
             const serialNum = e.target.value.trim();
             if (serialNum) {
@@ -127,28 +269,21 @@
                         } else {
                             const label = document.querySelector('label[for="serial_num"]');
                             label.classList.add('double-blink');
-
-                            // Знімаємо клас після завершення анімації, щоб можна було повторити
                             setTimeout(() => {
                                 label.classList.remove('double-blink');
-                            }, 1200); // Тривалість анімації
-
+                            }, 1200);
                             document.getElementById('serial_num').focus();
                             document.getElementById('serial_num').select();
                         }
                     }
                 })
                 .catch(error => {
-                    // Перевіряємо стан модального вікна на момент помилки
                     if (isModalOpen) {
                         const label = document.querySelector('label[for="serial_num"]');
                         label.classList.add('double-blink');
-
-                        // Знімаємо клас після завершення анімації, щоб можна було повторити
                         setTimeout(() => {
                             label.classList.remove('double-blink');
-                        }, 1200); // Тривалість анімації
-
+                        }, 1200);
                         document.getElementById('serial_num').focus();
                         document.getElementById('serial_num').select();
                     }
@@ -156,12 +291,10 @@
             }
         });
 
-        // Оновлюємо прапорець при закритті модального вікна
         document.getElementById('processModal').addEventListener('hidden.bs.modal', () => {
             processModal._isShown = false;
         });
 
-        // Відправка форми через AJAX
         function submitForm() {
             const formData = new FormData(document.getElementById('processForm'));
             fetch('/add_cartridge_event', {
@@ -175,6 +308,8 @@
                     processModal.hide();
                     document.getElementById('processForm').reset();
                     document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
+                    fetchInTransitCartridges();
+                    fetchInStorageCartridges();
                 } else {
                     alert('Помилка: ' + data.message);
                 }

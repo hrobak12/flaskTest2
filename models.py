@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey, String, Integer, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
+from sqlalchemy import Index
 from sqlalchemy.sql.expression import literal
 from datetime import datetime
 from flask_login import UserMixin
@@ -64,6 +65,13 @@ class CartridgeStatus(db.Model):
     exec_dept: Mapped[int] = mapped_column(ForeignKey(RefillDept.id))
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
+    #індекси
+    __table_args__ = (
+        Index('idx_cartridge_date', 'cartridge_id', 'date_ofchange'),  # Композитний індекс
+        Index('idx_status', 'status'),                                # Окремий індекс для status
+        Index('idx_exec_dept', 'exec_dept'),                          # Окремий індекс для exec_dept
+    )
+
 
 class EventLog(db.Model):
     __tablename__ = "event_log"

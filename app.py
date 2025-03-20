@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request
-from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func, and_
+from sqlalchemy.sql import text  # Додаємо імпорт text
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog
 from datetime import datetime
@@ -47,6 +48,13 @@ with app.app_context():
         print("Користувач admin створений!")
     else:
         print("Користувач admin уже існує.")
+
+        # Використовуємо text() для сирих SQL-запитів
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_cartridge_date ON cartrg_status (cartridge_id, date_ofchange)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_status ON cartrg_status (status)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_exec_dept ON cartrg_status (exec_dept)"))
+        db.session.commit()
+        print("Індекси створено або вже існують.")
 
 @app.route('/')
 @login_required
@@ -706,6 +714,68 @@ def api_equipments():
         'pagination': pagination_data
     })
 
+@app.route('/api/in_transit_cartridges', methods=['GET'])
+@login_required
+def api_in_transit_cartridges():
+    # Отримуємо поточну дату
+    current_date = datetime.utcnow()
+
+    # Підзапит для визначення останньої події для кожного картриджа
+    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
+                                       .filter(CartridgeStatus.date_ofchange <= current_date)\
+                                       .group_by(CartridgeStatus.cartridge_id)\
+                                       .subquery()
+
+    # Отримуємо картриджі зі статусом "В дорозі" (status = 3)
+    in_transit_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname)\
+                                 .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id)\
+                                 .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                                 .join(latest_status_subquery,
+                                       and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
+                                            CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
+                                 .filter(CartridgeStatus.status == 3)
+
+    cartridges_data = []
+    for cartridge, status, dept_name in in_transit_query.all():
+        cartridges_data.append({
+            'id': cartridge.id,
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': cartridge.cartridge_model,
+            'date_ofchange': status.date_ofchange.isoformat(),
+            'dept_name': dept_name,
+            'parcel_track': status.parcel_track
+        })
+
+    return jsonify({'cartridges': cartridges_data})
+
+
+# Новий ендпоінт для "На зберіганні"
+@app.route('/api/in_storage_cartridges', methods=['GET'])
+@login_required
+def api_in_storage_cartridges():
+    current_date = datetime.utcnow()
+    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
+                                       .filter(CartridgeStatus.date_ofchange <= current_date)\
+                                       .group_by(CartridgeStatus.cartridge_id)\
+                                       .subquery()
+    in_storage_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname)\
+                                 .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id)\
+                                 .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                                 .join(latest_status_subquery,
+                                       and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
+                                            CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
+                                 .filter(CartridgeStatus.status == 6)
+    cartridges_data = []
+    for cartridge, status, dept_name in in_storage_query.all():
+        cartridges_data.append({
+            'id': cartridge.id,
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': cartridge.cartridge_model,
+            'date_ofchange': status.date_ofchange.isoformat(),
+            'dept_name': dept_name,
+            'parcel_track': status.parcel_track
+        })
+    return jsonify({'cartridges': cartridges_data})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
