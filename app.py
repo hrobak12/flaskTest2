@@ -641,10 +641,13 @@ def api_cartridges():
     for cartridge in pagination.items:
         in_printer_info = None
         if cartridge.in_printer:
-            equipment = CustomerEquipment.query.get(cartridge.in_printer)
+            equipment = db.session.get(CustomerEquipment, cartridge.in_printer)
+#            equipment = CustomerEquipment.query.get(cartridge.in_printer)
             if equipment:
-                printer_model = PrinterModel.query.get(equipment.print_model)
-                dept = RefillDept.query.get(equipment.print_dept)
+                printer_model = db.session.get(PrinterModel, equipment.print_model)
+                dept = db.session.get(RefillDept, equipment.print_dept)
+#                printer_model = PrinterModel.query.get(equipment.print_model)
+#                dept = RefillDept.query.get(equipment.print_dept)
                 in_printer_info = f"{printer_model.model_name} ({dept.deptname})"
 
         cartridges_data.append({
