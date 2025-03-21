@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request
+from io import BytesIO
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, send_file
 from sqlalchemy import func, and_
 from sqlalchemy.sql import text  # Додаємо імпорт text
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog
 from datetime import datetime
 import bcrypt
+from openpyxl import Workbook
 
 
 app = Flask(__name__)
@@ -796,6 +798,199 @@ def api_cartridge_history(cartridge_id):
             'user_login': username  # Змінено з user_login на username у відповідь, але в запиті правильно User.username
         })
     return jsonify({'history': history_data})
+
+@app.route('/export/in_transit', methods=['GET'])
+@login_required
+def export_in_transit():
+    # Отримуємо дані з API для "Картриджі в дорозі"
+    current_date = datetime.utcnow()
+    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
+                                       .filter(CartridgeStatus.date_ofchange <= current_date)\
+                                       .group_by(CartridgeStatus.cartridge_id)\
+                                       .subquery()
+    in_transit_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname)\
+                                 .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id)\
+                                 .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                                 .join(latest_status_subquery,
+                                       and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
+                                            CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
+                                 .filter(CartridgeStatus.status == 3)  # Статус "В дорозі"
+    cartridges_data = []
+    for cartridge, status, dept_name in in_transit_query.all():
+        cartridges_data.append({
+            'id': cartridge.id,
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+            'date_ofchange': status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
+            'dept_name': dept_name or 'Не вказано',
+            'parcel_track': status.parcel_track or 'Не вказано'
+        })
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Картриджі в дорозі"
+    headers = ["ID", "Серійний номер", "Модель картриджа", "Дата зміни", "Відділ", "Трек-номер"]
+    ws.append(headers)
+    for cartridge in cartridges_data:
+        ws.append([cartridge['id'], cartridge['serial_num'], cartridge['cartridge_model'],
+                   cartridge['date_ofchange'], cartridge['dept_name'], cartridge['parcel_track']])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)  # Запас 2 символи
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))  # Межі: 10-50
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл у пам’яті
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Формуємо назву файлу
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Картриджі_в_дорозі_{timestamp}.xlsx"
+
+    return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+#маніпуляції з екселями
+@app.route('/export/in_storage', methods=['GET'])
+@login_required
+def export_in_storage():
+    # Отримуємо дані з API для "Картриджі на зберіганні"
+    current_date = datetime.utcnow()
+    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
+                                       .filter(CartridgeStatus.date_ofchange <= current_date)\
+                                       .group_by(CartridgeStatus.cartridge_id)\
+                                       .subquery()
+    in_storage_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname)\
+                                 .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id)\
+                                 .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                                 .join(latest_status_subquery,
+                                       and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
+                                            CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
+                                 .filter(CartridgeStatus.status == 6)  # Статус "На зберіганні"
+    cartridges_data = []
+    for cartridge, status, dept_name in in_storage_query.all():
+        cartridges_data.append({
+            'id': cartridge.id,
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+            'date_ofchange': status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
+            'dept_name': dept_name or 'Не вказано',
+            'parcel_track': status.parcel_track or 'Не вказано'
+        })
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Картриджі на зберіганні"
+    headers = ["ID", "Серійний номер", "Модель картриджа", "Дата зміни", "Відділ", "Трек-номер"]
+    ws.append(headers)
+    for cartridge in cartridges_data:
+        ws.append([cartridge['id'], cartridge['serial_num'], cartridge['cartridge_model'],
+                   cartridge['date_ofchange'], cartridge['dept_name'], cartridge['parcel_track']])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)  # Запас 2 символи
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))  # Межі: 10-50
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл у пам’яті
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Формуємо назву файлу
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Картриджі_на_зберіганні_{timestamp}.xlsx"
+
+    return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/export/cartridge_history/<int:cartridge_id>', methods=['GET'])
+@login_required
+def export_cartridge_history(cartridge_id):
+    # Отримуємо історію картриджа
+    history_query = db.session.query(CartridgeStatus, RefillDept.deptname, User.username)\
+                              .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                              .outerjoin(User, CartridgeStatus.user_updated == User.id)\
+                              .filter(CartridgeStatus.cartridge_id == cartridge_id)\
+                              .order_by(CartridgeStatus.date_ofchange.desc())
+    history_data = []
+    for status, dept_name, username in history_query.all():
+        history_data.append({
+            'date_ofchange': status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
+            'status': status.status,
+            'dept_name': dept_name or 'Не вказано',
+            'parcel_track': status.parcel_track or 'Не вказано',
+            'user_login': username or 'Не вказано'
+        })
+
+    # Отримуємо серійний номер картриджа для назви файлу з явною перевіркою типу
+    cartridge = Cartridges.query.get_or_404(cartridge_id)
+    serial_num = cartridge.serial_num
+    if not isinstance(serial_num, str):
+        serial_num = str(serial_num)
+    serial_num = serial_num.replace('/', '_').replace('\\', '_')  # Замінюємо недопустимі символи
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Історія_{serial_num}"
+    headers = ["Дата", "Статус", "Відділ", "Трек-номер", "Оновлено користувачем"]
+    ws.append(headers)
+    status_map = {
+        0: 'Порожній',
+        1: 'Очікує заправки',
+        2: 'Заправлений',
+        3: 'В дорозі',
+        4: 'Списаний',
+        5: 'Одноразовий',
+        6: 'На зберіганні'
+    }
+    for event in history_data:
+        ws.append([event['date_ofchange'], status_map.get(event['status'], 'Невідомий'),
+                   event['dept_name'], event['parcel_track'], event['user_login']])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                # Обчислюємо довжину вмісту (перетворюємо в строку)
+                value_length = len(str(cell.value))
+                # Оновлюємо максимальну ширину для колонки
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)  # Додаємо запас 2 символи
+
+    # Встановлюємо ширину колонок із обмеженнями (мін. 10, макс. 50)
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))  # Межі ширини: від 10 до 50
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width  # A=65, B=66 тощо
+
+    # Зберігаємо файл у пам’яті
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Формуємо назву файлу
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Історія_{serial_num}_{timestamp}.xlsx"
+
+    return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 
 
 if __name__ == '__main__':

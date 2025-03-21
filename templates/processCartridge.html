@@ -57,40 +57,44 @@
         </div>
     </div>
 
-    <!-- Модальне вікно для історії дій -->
-    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title" id="historyModalLabel">Історія дій для картриджа</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Дата</th>
-                                <th>Статус</th>
-                                <th>Відділ</th>
-                                <th>Трек-номер</th>
-                                <th>Оновлено користувачем</th>
-                            </tr>
-                        </thead>
-                        <tbody id="history-table-body">
-                            <!-- Дані завантажуються через JS -->
-                        </tbody>
-                    </table>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
-                </div>
+<!-- Модальне вікно для історії дій -->
+<div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="historyModalLabel">Історія дій для картриджа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Статус</th>
+                            <th>Відділ</th>
+                            <th>Трек-номер</th>
+                            <th>Оновлено користувачем</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body">
+                        <!-- Дані завантажуються через JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <a href="#" id="exportHistoryBtn" class="btn btn-excel">Звіт</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Таблиця картриджів "В дорозі" -->
     <div class="mt-5">
-        <h3>Картриджі в дорозі</h3>
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Картриджі в дорозі</h3>
+            <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
+        </div>
         <div class="card">
             <div class="card-body p-0">
                 <div style="max-height: 300px; overflow-y: auto;">
@@ -116,7 +120,10 @@
 
     <!-- Таблиця картриджів "На зберіганні" -->
     <div class="mt-4">
-        <h3>Картриджі на зберіганні</h3>
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Картриджі на зберіганні</h3>
+            <a href="/export/in_storage" class="btn btn-excel">Звіт</a>
+        </div>
         <div class="card">
             <div class="card-body p-0">
                 <div style="max-height: 300px; overflow-y: auto;">
@@ -173,6 +180,15 @@
         }
         .process-link:hover {
             color: #0056b3;
+        }
+        .btn-excel {
+            background-color: #1D6F42;
+            color: white;
+            border: none;
+        }
+        .btn-excel:hover {
+            background-color: #155932;
+            color: white;
         }
     </style>
 {% endblock %}
@@ -339,6 +355,9 @@
             .then(response => response.json())
             .then(data => {
                 updateHistoryTable(data.history);
+                // Оновлюємо URL кнопки "Звіт" із поточним cartridgeId
+                const exportBtn = document.getElementById('exportHistoryBtn');
+                exportBtn.href = `/export/cartridge_history/${cartridgeId}`;
                 historyModal.show();
             })
             .catch(error => console.error('Помилка:', error));
