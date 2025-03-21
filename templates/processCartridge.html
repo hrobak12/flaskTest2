@@ -2,7 +2,7 @@
 {% block title %}Обробка картриджів{% endblock %}
 {% block content %}
     <h1>Обробка картриджів</h1>
-    <h2>Натисніть F2 для обробки картриджів</h2>
+   <h2><a href="#" class="process-link" onclick="processModal.show(); return false;">Натисніть сюди</a> або F2 для обробки картриджів</h2>
 
     <!-- Модальне вікно для обробки -->
     <div class="modal fade" id="processModal" tabindex="-1" aria-labelledby="processModalLabel" aria-hidden="true">
@@ -38,7 +38,7 @@
                             <label for="exec_dept" class="form-label">Відділ (необов’язково)</label>
                             <select class="form-select" id="exec_dept" name="exec_dept">
                                 <option value="">Не вказано</option>
-                                {% for dept in RefillDept.query.all() %}
+                                {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
                                     <option value="{{ dept.id }}">{{ dept.deptname }}</option>
                                 {% endfor %}
                             </select>
@@ -52,6 +52,37 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
                     <button type="button" class="btn btn-primary" id="confirmProcess">Підтвердити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальне вікно для історії дій -->
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="historyModalLabel">Історія дій для картриджа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                                <th>Відділ</th>
+                                <th>Трек-номер</th>
+                                <th>Оновлено користувачем</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Дані завантажуються через JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
                 </div>
             </div>
         </div>
@@ -120,24 +151,28 @@
         .sticky-header th {
             border-bottom: 2px solid #dee2e6;
         }
-        /* Фіксовані ширини колонок */
-        .col-id {
-            width: 5%;
+        .col-id { width: 5%; }
+        .col-serial { width: 20%; }
+        .col-model { width: 20%; }
+        .col-date { width: 15%; }
+        .col-dept { width: 20%; }
+        .col-track { width: 20%; }
+        .serial-link {
+            color: #007bff;
+            text-decoration: underline;
+            cursor: pointer;
         }
-        .col-serial {
-            width: 20%;
+        .serial-link:hover {
+            color: #0056b3;
         }
-        .col-model {
-            width: 20%;
+
+        .process-link {
+            color: #007bff;
+            text-decoration: underline;
+            cursor: pointer;
         }
-        .col-date {
-            width: 15%;
-        }
-        .col-dept {
-            width: 20%;
-        }
-        .col-track {
-            width: 20%;
+        .process-link:hover {
+            color: #0056b3;
         }
     </style>
 {% endblock %}
@@ -155,14 +190,10 @@
         function fetchInTransitCartridges() {
             fetch('/api/in_transit_cartridges', {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             })
             .then(response => response.json())
-            .then(data => {
-                updateInTransitTable(data.cartridges);
-            })
+            .then(data => updateInTransitTable(data.cartridges))
             .catch(error => console.error('Помилка:', error));
         }
 
@@ -173,7 +204,7 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${cartridge.id}</td>
-                    <td>${cartridge.serial_num}</td>
+                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
                     <td>${cartridge.cartridge_model || 'Не вказано'}</td>
                     <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
                     <td>${cartridge.dept_name || 'Не вказано'}</td>
@@ -186,14 +217,10 @@
         function fetchInStorageCartridges() {
             fetch('/api/in_storage_cartridges', {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             })
             .then(response => response.json())
-            .then(data => {
-                updateInStorageTable(data.cartridges);
-            })
+            .then(data => updateInStorageTable(data.cartridges))
             .catch(error => console.error('Помилка:', error));
         }
 
@@ -204,7 +231,7 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${cartridge.id}</td>
-                    <td>${cartridge.serial_num}</td>
+                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
                     <td>${cartridge.cartridge_model || 'Не вказано'}</td>
                     <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
                     <td>${cartridge.dept_name || 'Не вказано'}</td>
@@ -215,10 +242,8 @@
         }
 
         const processModal = new bootstrap.Modal(document.getElementById('processModal'));
-        document.getElementById('processCartridge').addEventListener('click', (e) => {
-            e.preventDefault();
-            processModal.show();
-        });
+        const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F2') {
                 e.preventDefault();
@@ -231,9 +256,7 @@
         });
 
         document.getElementById('processModal').addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                processModal.hide();
-            }
+            if (e.key === 'Escape') processModal.hide();
         });
 
         document.getElementById('confirmProcess').addEventListener('click', submitForm);
@@ -250,28 +273,21 @@
                 let isModalOpen = processModal._isShown;
                 fetch('/check_cartridge', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ serial_num: serialNum })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (isModalOpen) {
-                        if (data.success) {
-                            const latestStatus = data.latest_status;
-                            if (latestStatus) {
-                                document.getElementById('status').value = latestStatus.status || '0';
-                                document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
-                                document.getElementById('exec_dept').value = latestStatus.exec_dept || '';
-                                document.getElementById('parcel_track').value = latestStatus.parcel_track || '';
-                            }
+                        if (data.success && data.latest_status) {
+                            document.getElementById('status').value = data.latest_status.status || '0';
+                            document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
+                            document.getElementById('exec_dept').value = data.latest_status.exec_dept || '';
+                            document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
                         } else {
                             const label = document.querySelector('label[for="serial_num"]');
                             label.classList.add('double-blink');
-                            setTimeout(() => {
-                                label.classList.remove('double-blink');
-                            }, 1200);
+                            setTimeout(() => label.classList.remove('double-blink'), 1200);
                             document.getElementById('serial_num').focus();
                             document.getElementById('serial_num').select();
                         }
@@ -281,9 +297,7 @@
                     if (isModalOpen) {
                         const label = document.querySelector('label[for="serial_num"]');
                         label.classList.add('double-blink');
-                        setTimeout(() => {
-                            label.classList.remove('double-blink');
-                        }, 1200);
+                        setTimeout(() => label.classList.remove('double-blink'), 1200);
                         document.getElementById('serial_num').focus();
                         document.getElementById('serial_num').select();
                     }
@@ -314,8 +328,44 @@
                     alert('Помилка: ' + data.message);
                 }
             })
-            .catch(error => {
-                alert('Помилка при відправці: ' + error);
+            .catch(error => alert('Помилка при відправці: ' + error));
+        }
+
+        function showHistory(cartridgeId) {
+            fetch(`/api/cartridge_history/${cartridgeId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateHistoryTable(data.history);
+                historyModal.show();
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function updateHistoryTable(history) {
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+            const statusMap = {
+                0: 'Порожній',
+                1: 'Очікує заправки',
+                2: 'Заправлений',
+                3: 'В дорозі',
+                4: 'Списаний',
+                5: 'Одноразовий',
+                6: 'На зберіганні'
+            };
+            history.forEach(event => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(event.date_ofchange).toLocaleString()}</td>
+                    <td>${statusMap[event.status] || 'Невідомий'}</td>
+                    <td>${event.dept_name || 'Не вказано'}</td>
+                    <td>${event.parcel_track || 'Не вказано'}</td>
+                    <td>${event.user_login || 'Не вказано'}</td>
+                `;
+                tbody.appendChild(row);
             });
         }
     </script>

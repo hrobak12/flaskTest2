@@ -318,7 +318,6 @@ def cartridges():
 
 @app.route('/add_cartridge', methods=['GET', 'POST'])
 @login_required
-@admin_required
 def add_cartridge():
     if request.method == 'POST':
         serial_num = request.form['serial_num']
@@ -764,7 +763,8 @@ def api_in_storage_cartridges():
                                  .join(latest_status_subquery,
                                        and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
                                             CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
-                                 .filter(CartridgeStatus.status == 6)
+                                 .filter(CartridgeStatus.status == 6)\
+                                 .order_by(Cartridges.cartridge_model.asc())  # Додаємо сортування
     cartridges_data = []
     for cartridge, status, dept_name in in_storage_query.all():
         cartridges_data.append({
@@ -776,6 +776,27 @@ def api_in_storage_cartridges():
             'parcel_track': status.parcel_track
         })
     return jsonify({'cartridges': cartridges_data})
+
+#маршрут для отримання історії дій картриджа:
+@app.route('/api/cartridge_history/<int:cartridge_id>', methods=['GET'])
+@login_required
+def api_cartridge_history(cartridge_id):
+    history_query = db.session.query(CartridgeStatus, RefillDept.deptname, User.username)\
+                              .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                              .outerjoin(User, CartridgeStatus.user_updated == User.id)\
+                              .filter(CartridgeStatus.cartridge_id == cartridge_id)\
+                              .order_by(CartridgeStatus.date_ofchange.desc())  # Сортуємо за датою, новіші першими
+    history_data = []
+    for status, dept_name, username in history_query.all():
+        history_data.append({
+            'date_ofchange': status.date_ofchange.isoformat(),
+            'status': status.status,
+            'dept_name': dept_name,
+            'parcel_track': status.parcel_track,
+            'user_login': username  # Змінено з user_login на username у відповідь, але в запиті правильно User.username
+        })
+    return jsonify({'history': history_data})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

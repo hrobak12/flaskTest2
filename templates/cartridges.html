@@ -84,6 +84,12 @@
         const searchInput = document.getElementById('search');
         const clearSearchBtn = document.getElementById('clear-search');
 
+        // Виклик при завантаженні сторінки
+        window.addEventListener('DOMContentLoaded', (event) => {
+            const initialSearch = searchInput.value.trim();
+            fetchCartridges(initialSearch, 1); // Завантажуємо першу сторінку з початковим пошуком
+        });
+
         // Обробка введення з debounce
         searchInput.addEventListener('input', function() {
             clearTimeout(timeout);
