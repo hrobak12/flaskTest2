@@ -4,12 +4,13 @@
     <h1>Список обладнання</h1>
     <div class="mb-3 d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">
-            <input type="text" id="search" class="form-control" placeholder="Пошук за моделлю" value="{{ search }}" style="max-width: 400px;">
+            <input type="text" id="search" class="form-control" placeholder="Пошук за інвентарним номером" value="{{ search|escape }}" style="max-width: 400px;">
             <button id="clear-search" class="btn btn-danger btn-sm ms-2" title="Очистити пошук">
                 <span>×</span>
             </button>
         </div>
         <div>
+            <a href="{{ url_for('export_equipments_table') }}" class="btn btn-excel me-2">Звіт</a>
             <a href="{{ url_for('add_equipment') }}" class="btn btn-success me-2">Додати обладнання</a>
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
         </div>
@@ -28,14 +29,14 @@
         <tbody id="equipment-table-body">
             {% for equip in equipments %}
             <tr>
-                <td>{{ equip.id }}</td>
-                <td>{{ PrinterModel.query.get(equip.print_model).model_name if equip.print_model else 'Не вказано' }}</td>
-                <td>{{ RefillDept.query.get(equip.print_dept).deptname if equip.print_dept else 'Не вказано' }}</td>
-                <td>{{ equip.serial_num }}</td>
-                <td>{{ equip.inventory_num }}</td>
+                <td>{{ equip[0].id }}</td>
+                <td>{{ equip[1] if equip[1] else 'Не вказано' }}</td>
+                <td>{{ equip[2] if equip[2] else 'Не вказано' }}</td>
+                <td>{{ equip[0].serial_num }}</td>
+                <td>{{ equip[0].inventory_num }}</td>
                 <td class="actions-column">
-                    <a href="{{ url_for('edit_equipment', equip_id=equip.id) }}" class="btn btn-warning btn-sm">Редагувати</a>
-                    <form action="{{ url_for('delete_equipment', equip_id=equip.id) }}" method="POST" class="d-inline">
+                    <a href="{{ url_for('edit_equipment', equip_id=equip[0].id) }}" class="btn btn-warning btn-sm">Редагувати</a>
+                    <form action="{{ url_for('delete_equipment', equip_id=equip[0].id) }}" method="POST" class="d-inline">
                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені, що хочете видалити це обладнання?');">Видалити</button>
                     </form>
                 </td>
@@ -46,6 +47,7 @@
 
     <nav aria-label="Page navigation">
         <ul class="pagination justify-content-center" id="pagination">
+            <!-- Пагінація оновлюється через JS -->
         </ul>
     </nav>
 
@@ -57,6 +59,15 @@
         #clear-search {
             padding: 0.25rem 0.5rem;
         }
+        .btn-excel {
+            background-color: #1D6F42;
+            color: white;
+            border: none;
+        }
+        .btn-excel:hover {
+            background-color: #155932;
+            color: white;
+        }
     </style>
 {% endblock %}
 
@@ -66,13 +77,11 @@
         const searchInput = document.getElementById('search');
         const clearSearchBtn = document.getElementById('clear-search');
 
-        // Виклик при завантаженні сторінки
         window.addEventListener('DOMContentLoaded', (event) => {
             const initialSearch = searchInput.value.trim();
-            fetchEquipments(initialSearch, 1); // Завантажуємо першу сторінку з початковим пошуком
+            fetchEquipments(initialSearch, 1);
         });
 
-        // Обробка введення з debounce
         searchInput.addEventListener('input', function() {
             clearTimeout(timeout);
             const searchValue = this.value.trim();
@@ -81,13 +90,11 @@
             }, 300);
         });
 
-        // Обробка натискання кнопки очистки
         clearSearchBtn.addEventListener('click', function() {
             searchInput.value = '';
             fetchEquipments('', 1);
         });
 
-        // Очищення поля вводу при натисканні Esc
         searchInput.addEventListener('keydown', function(event) {
             if (event.key === 'Escape' || event.keyCode === 27) {
                 searchInput.value = '';

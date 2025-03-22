@@ -1,3 +1,15 @@
+# Треба доробити processCartridge таким чином
+# В модальне вікно "Додати подію для картриджа"
+# додати випадаючий список "Принтер", який залежить від
+# випадаючого списку "Відділ (необов’язково)"
+# випадаючий список "Відділ (необов’язково)" зробити обов'язковим для заповнення
+# при успішному додаванні події оновлювати запис у таблиці "Cartridges" для
+# вибраного картриджа і змінювати принтер, на той куди його поставили
+# тобто поле "in_printer"
+# додати поле curr_status: Mapped[int] до таблиці "Cartridges" і також його
+# міняти при зміні події для картрижа
+
+import os, secrets
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, send_file
 from sqlalchemy import func, and_
@@ -10,7 +22,10 @@ from openpyxl import Workbook
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_secret_key_here'
+# Тільки для розробки
+# Виведе випадковий 64-символьний ключ, якщо інший не заданий в системі
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cartridge.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -37,7 +52,6 @@ def admin_required(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
-
 # Ініціалізація бази даних і створення початкового користувача
 with app.app_context():
     db.create_all()
@@ -59,6 +73,7 @@ with app.app_context():
         print("Індекси створено або вже існують.")
 
 @app.route('/')
+@app.route('/index')
 @login_required
 def index():
     return render_template('index.html', user=current_user, RefillDept=RefillDept)
@@ -212,24 +227,30 @@ def delete_printer_model(model_id):
     return redirect(url_for('printer_models'))
 
 # CRUD для CustomerEquipment
+# Основний маршрут для відображення обладнання
 @app.route('/equipments')
 @login_required
 def equipments():
     search = request.args.get('search', '')
-    page = request.args.get('page', 1, type=int)  # Отримуємо номер сторінки з URL
-    per_page = 10  # Кількість записів на сторінці (можете змінити)
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
 
-    # Базовий запит із фільтром пошуку
-    query = CustomerEquipment.query.filter(CustomerEquipment.serial_num.ilike(f'%{search}%'))
-    # Додаємо пагінацію
+    query = db.session.query(CustomerEquipment, PrinterModel.model_name, RefillDept.deptname)\
+                      .outerjoin(PrinterModel, PrinterModel.id == CustomerEquipment.print_model)\
+                      .outerjoin(RefillDept, RefillDept.id == CustomerEquipment.print_dept)\
+                      .order_by(CustomerEquipment.id)
+
+    if search:
+        query = query.filter(CustomerEquipment.inventory_num.ilike(f'%{search}%'))
+
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    equipments = pagination.items  # Обладнання на поточній сторінці
+    equipments = [(e[0], e[1], e[2]) for e in pagination.items]
 
     return render_template('equipments.html',
-                           RefillDept=RefillDept,
-                           PrinterModel=PrinterModel,
                            equipments=equipments,
                            search=search,
+                           PrinterModel=PrinterModel,
+                           RefillDept=RefillDept,
                            pagination=pagination)
 
 @app.route('/add_equipment', methods=['GET', 'POST'])
@@ -437,22 +458,34 @@ def send_to_refill(cartridge_id):
     flash('Картридж відправлено на заправку!')
     return redirect(url_for('cartridges'))
 
-## Управління статусами картриджів
+# Відображення подій обробки картриджів та керування ними
+# Основний маршрут для відображення подій
+# Основний маршрут для відображення подій
+# Основний маршрут для відображення подій
 @app.route('/cartridge_status')
 @login_required
 def cartridge_status():
     search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+
+    # Базовий запит із JOIN для оптимізації
+    query = db.session.query(CartridgeStatus, Cartridges.serial_num, RefillDept.deptname)\
+                      .outerjoin(Cartridges, Cartridges.id == CartridgeStatus.cartridge_id)\
+                      .outerjoin(RefillDept, RefillDept.id == CartridgeStatus.exec_dept)\
+                      .order_by(CartridgeStatus.date_ofchange.desc())
+
     if search:
-        statuses = CartridgeStatus.query.join(Cartridges, Cartridges.id == CartridgeStatus.cartridge_id).filter(
-            Cartridges.serial_num.ilike(f'%{search}%')
-        ).all()
-    else:
-        statuses = CartridgeStatus.query.all()
+        query = query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
+
+    # Пагінація
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    statuses = [(s[0], s[1] or 'Не вказано', s[2] or 'Не вказано') for s in pagination.items]
+
     return render_template('cartridge_status.html',
                            statuses=statuses,
                            search=search,
-                           Cartridges=Cartridges,  # Залишаємо для сумісності
-                           RefillDept=RefillDept)  # Залишаємо для сумісності
+                           pagination=pagination)
 
 @app.route('/update_status/<int:status_id>', methods=['POST'])
 @login_required
@@ -672,51 +705,42 @@ def api_cartridges():
         'pagination': pagination_data
     })
 
+# API для асинхронного пошуку по інвентарному номеру
 @app.route('/api/equipments', methods=['GET'])
 @login_required
 def api_equipments():
     search = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)
-    per_page = 10
+    per_page = 20
 
-    # Фільтруємо по назві моделі через join із PrinterModel
+    query = db.session.query(CustomerEquipment, PrinterModel.model_name, RefillDept.deptname)\
+                      .outerjoin(PrinterModel, PrinterModel.id == CustomerEquipment.print_model)\
+                      .outerjoin(RefillDept, RefillDept.id == CustomerEquipment.print_dept)\
+                      .order_by(CustomerEquipment.id)
+
     if search:
-        query = CustomerEquipment.query.join(PrinterModel, CustomerEquipment.print_model == PrinterModel.id)\
-                                       .filter(PrinterModel.model_name.ilike(f'%{search}%'))
-    else:
-        query = CustomerEquipment.query
+        query = query.filter(CustomerEquipment.inventory_num.ilike(f'%{search}%'))
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-
-    equipments_data = []
-    for equip in pagination.items:
-        # Використовуємо db.session.get замість query.get
-        model = db.session.get(PrinterModel, equip.print_model) if equip.print_model else None
-        dept = db.session.get(RefillDept, equip.print_dept) if equip.print_dept else None
-        model_name = model.model_name if model else None
-        dept_name = dept.deptname if dept else None
-        equipments_data.append({
-            'id': equip.id,
-            'model_name': model_name,
-            'dept_name': dept_name,
-            'serial_num': equip.serial_num,
-            'inventory_num': equip.inventory_num
-        })
+    equipments = [{
+        'id': e[0].id,
+        'model_name': e[1] or 'Не вказано',
+        'dept_name': e[2] or 'Не вказано',
+        'serial_num': e[0].serial_num,
+        'inventory_num': e[0].inventory_num
+    } for e in pagination.items]
 
     pagination_data = {
         'has_prev': pagination.has_prev,
-        'has_next': pagination.has_next,
         'prev_num': pagination.prev_num,
+        'has_next': pagination.has_next,
         'next_num': pagination.next_num,
         'current_page': pagination.page,
-        'pages': list(pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1)),
+        'pages': list(pagination.iter_pages()),
         'search': search
     }
 
-    return jsonify({
-        'equipments': equipments_data,
-        'pagination': pagination_data
-    })
+    return jsonify({'equipments': equipments, 'pagination': pagination_data})
 
 @app.route('/api/in_transit_cartridges', methods=['GET'])
 @login_required
@@ -801,6 +825,44 @@ def api_cartridge_history(cartridge_id):
             'user_login': username  # Змінено з user_login на username у відповідь, але в запиті правильно User.username
         })
     return jsonify({'history': history_data})
+
+# API для асинхронного пошуку подій обробки картриджів
+@app.route('/api/cartridge_status', methods=['GET'])
+@login_required
+def api_cartridge_status():
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+
+    query = db.session.query(CartridgeStatus, Cartridges.serial_num, RefillDept.deptname)\
+                      .outerjoin(Cartridges, Cartridges.id == CartridgeStatus.cartridge_id)\
+                      .outerjoin(RefillDept, RefillDept.id == CartridgeStatus.exec_dept)\
+                      .order_by(CartridgeStatus.date_ofchange.desc())
+
+    if search:
+        query = query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
+
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    statuses = [{
+        'id': s[0].id,
+        'serial_num': s[1] or 'Не вказано',
+        'status': s[0].status,
+        'date_ofchange': s[0].date_ofchange.isoformat(),
+        'parcel_track': s[0].parcel_track,
+        'deptname': s[2] or 'Не вказано'
+    } for s in pagination.items]
+
+    pagination_data = {
+        'has_prev': pagination.has_prev,
+        'prev_num': pagination.prev_num,
+        'has_next': pagination.has_next,
+        'next_num': pagination.next_num,
+        'current_page': pagination.page,
+        'pages': list(pagination.iter_pages()),
+        'search': search
+    }
+
+    return jsonify({'statuses': statuses, 'pagination': pagination_data})
 
 @app.route('/export/in_transit', methods=['GET'])
 @login_required
@@ -994,7 +1056,98 @@ def export_cartridge_history(cartridge_id):
 
     return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+# Маршрут для експорту в Excel подій обробки картриджів
+# Маршрут для експорту в Excel (змінено на /export/cartridge_status)
+@app.route('/export/cartridge_events', methods=['GET'])
+@login_required
+def export_cartridge_events():
+    search = request.args.get('search', '')
 
+    query = db.session.query(CartridgeStatus, Cartridges.serial_num, RefillDept.deptname)\
+                      .outerjoin(Cartridges, Cartridges.id == CartridgeStatus.cartridge_id)\
+                      .outerjoin(RefillDept, RefillDept.id == CartridgeStatus.exec_dept)\
+                      .order_by(CartridgeStatus.date_ofchange.desc())
+    if search:
+        query = query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
+
+    statuses = [(s[0], s[1] or 'Не вказано', s[2] or 'Не вказано') for s in query.all()]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Події обробки картриджів"
+    headers = ["ID", "Картридж", "Статус", "Дата зміни", "Трек-номер", "Відділ"]
+    ws.append(headers)
+    status_map = {0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений', 3: 'В дорозі',
+                  4: 'Списаний', 5: 'Одноразовий', 6: 'На зберіганні'}
+    for status, serial_num, deptname in statuses:
+        ws.append([status.id, serial_num, status_map.get(status.status, 'Невідомий'),
+                   status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
+                   status.parcel_track or 'Немає', deptname])
+
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Події_обробки_картриджів_{timestamp}.xlsx"
+    return send_file(output, download_name=filename, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# Маршрут для експорту в Excel
+@app.route('/export/equipments_table', methods=['GET'])
+@login_required
+def export_equipments_table():
+    search = request.args.get('search', '')
+
+    query = db.session.query(CustomerEquipment, PrinterModel.model_name, RefillDept.deptname)\
+                      .outerjoin(PrinterModel, PrinterModel.id == CustomerEquipment.print_model)\
+                      .outerjoin(RefillDept, RefillDept.id == CustomerEquipment.print_dept)\
+                      .order_by(CustomerEquipment.id)
+    if search:
+        query = query.filter(CustomerEquipment.inventory_num.ilike(f'%{search}%'))
+
+    equipments = [(e[0], e[1] or 'Не вказано', e[2] or 'Не вказано') for e in query.all()]
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Список обладнання"
+    headers = ["ID", "Модель", "Відділ", "Серійний номер", "Інвентарний номер"]
+    ws.append(headers)
+    for equip, model_name, deptname in equipments:
+        ws.append([equip.id, model_name, deptname, equip.serial_num, equip.inventory_num])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Список_обладнання_{timestamp}.xlsx"
+    return send_file(output, download_name=filename, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
