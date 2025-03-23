@@ -119,6 +119,7 @@
     </div>
 
     <!-- Таблиця картриджів "На зберіганні" -->
+    <!-- Таблиця картриджів "На зберіганні" -->
     <div class="mt-4">
         <div class="d-flex justify-content-between align-items-center">
             <h3>Картриджі на зберіганні</h3>
@@ -135,7 +136,7 @@
                                 <th class="col-model">Модель картриджа</th>
                                 <th class="col-date">Дата зміни</th>
                                 <th class="col-dept">Відділ</th>
-                                <th class="col-track">Трек-номер</th>
+                                <th class="col-status">Статус</th> <!-- Замінено Трек-номер на Статус -->
                             </tr>
                         </thead>
                         <tbody id="in-storage-table-body">
@@ -148,49 +149,49 @@
     </div>
 
     <!-- Додаємо стилі -->
-    <style>
-        .sticky-header {
-            position: sticky;
-            top: 0;
-            background-color: #f8f9fa;
-            z-index: 1;
-        }
-        .sticky-header th {
-            border-bottom: 2px solid #dee2e6;
-        }
-        .col-id { width: 5%; }
-        .col-serial { width: 20%; }
-        .col-model { width: 20%; }
-        .col-date { width: 15%; }
-        .col-dept { width: 20%; }
-        .col-track { width: 20%; }
-        .serial-link {
-            color: #007bff;
-            text-decoration: underline;
-            cursor: pointer;
-        }
-        .serial-link:hover {
-            color: #0056b3;
-        }
-
-        .process-link {
-            color: #007bff;
-            text-decoration: underline;
-            cursor: pointer;
-        }
-        .process-link:hover {
-            color: #0056b3;
-        }
-        .btn-excel {
-            background-color: #1D6F42;
-            color: white;
-            border: none;
-        }
-        .btn-excel:hover {
-            background-color: #155932;
-            color: white;
-        }
-    </style>
+<style>
+    .sticky-header {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 1;
+    }
+    .sticky-header th {
+        border-bottom: 2px solid #dee2e6;
+    }
+    .col-id { width: 5%; }
+    .col-serial { width: 20%; }
+    .col-model { width: 20%; }
+    .col-date { width: 15%; }
+    .col-dept { width: 20%; }
+    .col-track { width: 20%; }
+    .col-status { width: 20%; } /* Додано */
+    .serial-link {
+        color: #007bff;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+    .serial-link:hover {
+        color: #0056b3;
+    }
+    .process-link {
+        color: #007bff;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+    .process-link:hover {
+        color: #0056b3;
+    }
+    .btn-excel {
+        background-color: #1D6F42;
+        color: white;
+        border: none;
+    }
+    .btn-excel:hover {
+        background-color: #155932;
+        color: white;
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
@@ -243,6 +244,10 @@
         function updateInStorageTable(cartridges) {
             const tbody = document.getElementById('in-storage-table-body');
             tbody.innerHTML = '';
+            const statusMap = {
+                1: 'Очікує заправки',
+                6: 'На зберіганні'
+            };
             cartridges.forEach(cartridge => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -251,7 +256,7 @@
                     <td>${cartridge.cartridge_model || 'Не вказано'}</td>
                     <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
                     <td>${cartridge.dept_name || 'Не вказано'}</td>
-                    <td>${cartridge.parcel_track || 'Не вказано'}</td>
+                    <td>${statusMap[cartridge.status] || 'Невідомий'}</td>
                 `;
                 tbody.appendChild(row);
             });

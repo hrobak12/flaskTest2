@@ -24,6 +24,11 @@ class RefillDept(db.Model):
     __tablename__ = "refill_dept"
     id: Mapped[int] = mapped_column(primary_key=True)
     deptname: Mapped[str] = mapped_column(String(30))
+    addr1: Mapped[str] = mapped_column(String(255))
+    addr2: Mapped[str] = mapped_column(String(255))
+    addr3: Mapped[str] = mapped_column(String(255))
+    addr4: Mapped[str] = mapped_column(String(255))
+    addr5: Mapped[str] = mapped_column(String(255))
     is_exec: Mapped[int] = mapped_column(Integer, server_default=literal(0))
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())

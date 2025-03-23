@@ -9,6 +9,18 @@
 # додати поле curr_status: Mapped[int] до таблиці "Cartridges" і також його
 # міняти при зміні події для картрижа
 
+
+#DONE: Таблиця "Картриджі на зберіганні" має наповнюватись даними на основі статусів "На зберіганні" та "Очікує заправки".
+#DONE: В таблиці "Картриджі на зберіганні". Колонку "трек номер" замінити на колонку "статус"
+#
+#
+#
+#
+#
+#
+#
+#
+
 import os, secrets
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, send_file
@@ -110,6 +122,7 @@ def refill_depts():
                            pagination=pagination,
                            search=search)
 
+
 @app.route('/add_refill_dept', methods=['GET', 'POST'])
 @admin_required
 @login_required
@@ -120,12 +133,23 @@ def add_refill_dept():
             flash('Відділ із такою назвою вже існує!')
             return render_template('add_refill_dept.html')
         is_exec = int(request.form['is_exec'])
-        dept = RefillDept(deptname=deptname, is_exec=is_exec, user_updated=current_user.id)
+        dept = RefillDept(
+            deptname=deptname,
+            addr1=request.form.get('addr1', ''),  # Отримуємо addr1, за замовчуванням ''
+            addr2=request.form.get('addr2', ''),  # Отримуємо addr2, за замовчуванням ''
+            addr3=request.form.get('addr3', ''),  # Отримуємо addr3, за замовчуванням ''
+            addr4=request.form.get('addr4', ''),  # Отримуємо addr4, за замовчуванням ''
+            addr5=request.form.get('addr5', ''),  # Отримуємо addr5, за замовчуванням ''
+            is_exec=is_exec,
+            user_updated=current_user.id,
+            time_updated=datetime.utcnow()  # Встановлюємо початковий час
+        )
         db.session.add(dept)
         db.session.commit()
         flash('Відділ додано!')
         return redirect(url_for('refill_depts'))
     return render_template('add_refill_dept.html')
+
 
 @app.route('/edit_refill_dept/<int:dept_id>', methods=['GET', 'POST'])
 @admin_required
@@ -138,8 +162,14 @@ def edit_refill_dept(dept_id):
             flash('Відділ із такою назвою вже існує!')
             return render_template('edit_refill_dept.html', dept=dept)
         dept.deptname = deptname
+        dept.addr1 = request.form.get('addr1', '')  # Отримуємо addr1, за замовчуванням ''
+        dept.addr2 = request.form.get('addr2', '')  # Отримуємо addr2, за замовчуванням ''
+        dept.addr3 = request.form.get('addr3', '')  # Отримуємо addr3, за замовчуванням ''
+        dept.addr4 = request.form.get('addr4', '')  # Отримуємо addr4, за замовчуванням ''
+        dept.addr5 = request.form.get('addr5', '')  # Отримуємо addr5, за замовчуванням ''
         dept.is_exec = int(request.form['is_exec'])
         dept.user_updated = current_user.id
+        dept.time_updated = datetime.utcnow()  # Оновлюємо час зміни
         db.session.commit()
         flash('Відділ оновлено!')
         return redirect(url_for('refill_depts'))
@@ -792,19 +822,20 @@ def api_in_storage_cartridges():
                                  .join(latest_status_subquery,
                                        and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
                                             CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
-                                 .filter(CartridgeStatus.status == 6)\
-                                 .order_by(Cartridges.cartridge_model.asc())  # Додаємо сортування
+                                 .filter(CartridgeStatus.status.in_([1, 6]))\
+                                 .order_by(Cartridges.cartridge_model.asc())  # Змінено на 1 і 6 # Сортування за моделлю
     cartridges_data = []
     for cartridge, status, dept_name in in_storage_query.all():
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
             'cartridge_model': cartridge.cartridge_model,
+            'status': status.status,  # Додаємо статус замість parcel_track
             'date_ofchange': status.date_ofchange.isoformat(),
-            'dept_name': dept_name,
-            'parcel_track': status.parcel_track
+            'dept_name': dept_name or 'Не вказано'
         })
     return jsonify({'cartridges': cartridges_data})
+
 
 #маршрут для отримання історії дій картриджа:
 @app.route('/api/cartridge_history/<int:cartridge_id>', methods=['GET'])

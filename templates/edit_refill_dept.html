@@ -8,6 +8,26 @@
             <input type="text" name="deptname" id="deptname" class="form-control" value="{{ dept.deptname }}" required>
         </div>
         <div class="mb-3">
+            <label for="addr1" class="form-label">Адреса 1</label>
+            <input type="text" name="addr1" id="addr1" class="form-control" value="{{ dept.addr1 or '' }}">
+        </div>
+        <div class="mb-3">
+            <label for="addr2" class="form-label">Адреса 2</label>
+            <input type="text" name="addr2" id="addr2" class="form-control" value="{{ dept.addr2 or '' }}">
+        </div>
+        <div class="mb-3">
+            <label for="addr3" class="form-label">Адреса 3</label>
+            <input type="text" name="addr3" id="addr3" class="form-control" value="{{ dept.addr3 or '' }}">
+        </div>
+        <div class="mb-3">
+            <label for="addr4" class="form-label">Адреса 4</label>
+            <input type="text" name="addr4" id="addr4" class="form-control" value="{{ dept.addr4 or '' }}">
+        </div>
+        <div class="mb-3">
+            <label for="addr5" class="form-label">Адреса 5</label>
+            <input type="text" name="addr5" id="addr5" class="form-control" value="{{ dept.addr5 or '' }}">
+        </div>
+        <div class="mb-3">
             <label for="is_exec" class="form-label">Тип відділу</label>
             <select name="is_exec" id="is_exec" class="form-select" required>
                 <option value="0" {% if not dept.is_exec %}selected{% endif %}>Клієнт</option>
