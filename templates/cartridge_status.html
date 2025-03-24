@@ -31,20 +31,20 @@
             <tr>
                 <td>{{ status.id }}</td>
                 <td>{{ serial_num }}</td>
-                <td>{{ {0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений', 3: 'В дорозі', 4: 'Списаний', 5: 'Одноразовий', 6: 'На зберіганні'}[status.status] }}</td>
+                <td>{{ {0: 'Не вказано', 1: 'На зберіганні (порожній)', 2: 'Відправлено в користування', 3: 'Відправлено на заправку', 4: 'Непридатний (списаний)', 5: 'Одноразовий (фарба у банці)', 6: 'На зберіганні (заправлений)'}[status.status] }}</td>
                 <td>{{ status.date_ofchange.strftime('%Y-%m-%d %H:%M') }}</td>
                 <td>{{ status.parcel_track or 'Немає' }}</td>
                 <td>{{ deptname }}</td>
                 <td class="actions-column">
                     <form action="{{ url_for('update_status', status_id=status.id) }}" method="POST" class="d-inline">
                         <select name="status" class="form-select d-inline w-auto">
-                            <option value="0" {% if status.status == 0 %}selected{% endif %}>Порожній</option>
-                            <option value="1" {% if status.status == 1 %}selected{% endif %}>Очікує заправки</option>
-                            <option value="2" {% if status.status == 2 %}selected{% endif %}>Заправлений</option>
-                            <option value="3" {% if status.status == 3 %}selected{% endif %}>В дорозі</option>
-                            <option value="4" {% if status.status == 4 %}selected{% endif %}>Списаний</option>
-                            <option value="5" {% if status.status == 5 %}selected{% endif %}>Одноразовий</option>
-                            <option value="6" {% if status.status == 6 %}selected{% endif %}>На зберіганні</option>
+                            <option value="0" {% if status.status == 0 %}selected{% endif %}>Не вказано</option>
+                            <option value="1" {% if status.status == 1 %}selected{% endif %}>На зберіганні (порожній)</option>
+                            <option value="2" {% if status.status == 2 %}selected{% endif %}>Відправлено в користування</option>
+                            <option value="3" {% if status.status == 3 %}selected{% endif %}>Відправлено на заправку</option>
+                            <option value="4" {% if status.status == 4 %}selected{% endif %}>Непридатний (списаний)</option>
+                            <option value="5" {% if status.status == 5 %}selected{% endif %}>Одноразовий (фарба у банці)</option>
+                            <option value="6" {% if status.status == 6 %}selected{% endif %}>На зберіганні (заправлений)</option>
                         </select>
                         <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
                     </form>
@@ -118,8 +118,8 @@
             const tbody = document.getElementById('status-table-body');
             tbody.innerHTML = '';
             const statusMap = {
-                0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений', 3: 'В дорозі',
-                4: 'Списаний', 5: 'Одноразовий', 6: 'На зберіганні'
+                0: 'Не вказано', 1: 'На зберіганні (порожній)', 2: 'Відправлено в користування', 3: 'Відправлено на заправку',
+                4: 'Непридатний (списаний)', 5: 'Одноразовий (фарба у банці)', 6: 'На зберіганні (заправлений)'
             };
             statuses.forEach(status => {
                 const row = document.createElement('tr');
@@ -133,13 +133,13 @@
                     <td class="actions-column">
                         <form action="/update_status/${status.id}" method="POST" class="d-inline">
                             <select name="status" class="form-select d-inline w-auto">
-                                <option value="0" ${status.status === 0 ? 'selected' : ''}>Порожній</option>
-                                <option value="1" ${status.status === 1 ? 'selected' : ''}>Очікує заправки</option>
-                                <option value="2" ${status.status === 2 ? 'selected' : ''}>Заправлений</option>
-                                <option value="3" ${status.status === 3 ? 'selected' : ''}>В дорозі</option>
-                                <option value="4" ${status.status === 4 ? 'selected' : ''}>Списаний</option>
-                                <option value="5" ${status.status === 5 ? 'selected' : ''}>Одноразовий</option>
-                                <option value="6" ${status.status === 6 ? 'selected' : ''}>На зберіганні</option>
+                                <option value="0" ${status.status === 0 ? 'selected' : ''}>Не вказано</option>
+                                <option value="1" ${status.status === 1 ? 'selected' : ''}>На зберіганні (порожній)</option>
+                                <option value="2" ${status.status === 2 ? 'selected' : ''}>Відправлено в користування</option>
+                                <option value="3" ${status.status === 3 ? 'selected' : ''}>Відправлено на заправку</option>
+                                <option value="4" ${status.status === 4 ? 'selected' : ''}>Непридатний (списаний)</option>
+                                <option value="5" ${status.status === 5 ? 'selected' : ''}>Одноразовий (фарба у банці)</option>
+                                <option value="6" ${status.status === 6 ? 'selected' : ''}>На зберіганні (заправлений)</option>
                             </select>
                             <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
                         </form>

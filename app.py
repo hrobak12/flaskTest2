@@ -965,13 +965,14 @@ def export_in_storage():
                                        .filter(CartridgeStatus.date_ofchange <= current_date)\
                                        .group_by(CartridgeStatus.cartridge_id)\
                                        .subquery()
-    in_storage_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname)\
-                                 .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id)\
-                                 .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
-                                 .join(latest_status_subquery,
-                                       and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
-                                            CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
-                                 .filter(CartridgeStatus.status == 6)  # Статус "На зберіганні"
+    in_storage_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname) \
+                                       .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id) \
+                                       .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id) \
+                                       .join(latest_status_subquery,
+                                             and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
+                                                  CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date)) \
+                                       .filter(CartridgeStatus.status.in_([1, 6]))  # Вибираємо статуси 1 і 6
+
     cartridges_data = []
     for cartridge, status, dept_name in in_storage_query.all():
         cartridges_data.append({
@@ -1049,13 +1050,13 @@ def export_cartridge_history(cartridge_id):
     headers = ["Дата", "Статус", "Відділ", "Трек-номер", "Оновлено користувачем"]
     ws.append(headers)
     status_map = {
-        0: 'Порожній',
-        1: 'Очікує заправки',
-        2: 'Заправлений',
-        3: 'В дорозі',
-        4: 'Списаний',
-        5: 'Одноразовий',
-        6: 'На зберіганні'
+        0: 'Не вказано',
+        1: 'На зберіганні (порожній)',
+        2: 'Відправлено в користування',
+        3: 'Відправлено на заправку',
+        4: 'Непридатний (списаний)',
+        5: 'Одноразовий (фарба у банці)',
+        6: 'На зберіганні (заправлений)'
     }
     for event in history_data:
         ws.append([event['date_ofchange'], status_map.get(event['status'], 'Невідомий'),
