@@ -91,9 +91,12 @@
 
     <!-- Таблиця картриджів "В дорозі" -->
     <div class="mt-5">
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center ">
             <h3>Картриджі в дорозі</h3>
-            <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
+            <div>
+                <a href="/generate_shipping_label" class="btn btn-acrobat">Ярлик</a>
+                <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
+            </div>
         </div>
         <div class="card">
             <div class="card-body p-0">
@@ -104,8 +107,8 @@
                                 <th class="col-id">ID</th>
                                 <th class="col-serial">Серійний номер</th>
                                 <th class="col-model">Модель картриджа</th>
-                                <th class="col-date">Дата зміни</th>
-                                <th class="col-dept">Відділ</th>
+                                <th class="col-date">Дата відправки</th>
+                                <th class="col-dept">Відділ (куди)</th>
                                 <th class="col-track">Трек-номер</th>
                             </tr>
                         </thead>
@@ -134,7 +137,7 @@
                                 <th class="col-id">ID</th>
                                 <th class="col-serial">Серійний номер</th>
                                 <th class="col-model">Модель картриджа</th>
-                                <th class="col-date">Дата зміни</th>
+                                <th class="col-date">Дата обробки</th>
                                 <th class="col-dept">Відділ</th>
                                 <th class="col-status">Статус</th> <!-- Замінено Трек-номер на Статус -->
                             </tr>
@@ -187,10 +190,27 @@
         color: white;
         border: none;
     }
+    .btn-excel2 {
+        background-color: #F40F02;
+        color: white;
+        border: none;
+    }
     .btn-excel:hover {
         background-color: #155932;
         color: white;
     }
+
+    .btn-acrobat {
+        background-color: #E40F02; /* Червоний колір Acrobat */
+        border-color: #E40F02;
+        color: white; /* Білий текст для контрасту */
+    }
+    .btn-acrobat:hover {
+        background-color: #d30d02; /* Темніший червоний при наведенні */
+        border-color: #d30d02;
+        color: white;
+    }
+
 </style>
 {% endblock %}
 
