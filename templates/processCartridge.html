@@ -14,9 +14,16 @@
                 </div>
                 <div class="modal-body">
                     <form id="processForm">
+<!--
                         <div class="mb-3">
                             <label for="serial_num" class="form-label">Серійний номер</label>
                             <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Введіть або відскануйте" required autofocus>
+                        </div>
+-->
+                        <div class="mb-3 position-relative">
+                            <label for="serial_num" class="form-label">Серійний номер</label>
+                            <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Введіть або відскануйте" required autofocus>
+                            <div id="serial-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
                         </div>
                         <div class="mb-3">
                             <label for="status" class="form-label">Статус</label>
@@ -210,6 +217,18 @@
         border-color: #d30d02;
         color: white;
     }
+    .serial-suggestions.show {
+        display: block;
+    }
+    .serial-suggestions {
+        word-break: break-word; /* Переносить довгі слова на новий рядок */
+        white-space: normal;   /* Дозволяє перенос тексту */
+        overflow-x: hidden;    /* Ховає горизонтальну прокрутку */
+    }
+    .serial-suggestions .dropdown-item {
+        white-space: normal;   /* Дозволяє перенос тексту в пунктах */
+        overflow-x: hidden;    /* Ховає горизонтальну прокрутку в пунктах */
+    }
 
 </style>
 {% endblock %}
@@ -223,6 +242,148 @@
             fetchInTransitCartridges();
             fetchInStorageCartridges();
         });
+
+//***************************************************
+        // Додаємо обробник для введення в поле "Серійний номер"
+        const serialInput = document.getElementById('serial_num');
+        const suggestionsDropdown = document.getElementById('serial-suggestions');
+        let selectedIndex = -1;
+
+        serialInput.addEventListener('input', debounce((e) => {
+            const query = e.target.value.trim();
+            if (query.length >= 2) { // Починаємо пошук після введення 2 символів
+                fetch(`/api/cartridges?search=${encodeURIComponent(query)}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    updateSuggestions(data.cartridges);
+                })
+                .catch(error => console.error('Помилка:', error));
+            } else {
+                suggestionsDropdown.innerHTML = '';
+                suggestionsDropdown.classList.remove('show');
+            }
+        }, 300));
+
+        // Обробка клавіатури для навігації по пропозиціях
+        serialInput.addEventListener('keydown', (e) => {
+            const items = suggestionsDropdown.querySelectorAll('.dropdown-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(items);
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                items[selectedIndex].click();
+            }
+        });
+
+        // Оновлення пропозицій у dropdown
+        function updateSuggestions(cartridges) {
+            suggestionsDropdown.innerHTML = '';
+            selectedIndex = -1;
+            if (cartridges.length > 0) {
+                cartridges.forEach(cartridge => {
+                    const item = document.createElement('a');
+                    item.classList.add('dropdown-item');
+                    item.href = '#';
+                    item.textContent = `${cartridge.serial_num} (${cartridge.cartridge_model || 'Без моделі'})`;
+                    item.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        serialInput.value = cartridge.serial_num;
+                        suggestionsDropdown.innerHTML = '';
+                        suggestionsDropdown.classList.remove('show');
+                        triggerBlurEvent(); // Викликаємо blur для завантаження статусу
+                    });
+                    suggestionsDropdown.appendChild(item);
+                });
+                suggestionsDropdown.classList.add('show');
+            } else {
+                suggestionsDropdown.classList.remove('show');
+            }
+        }
+
+        // Оновлення виділення в dropdown
+        function updateSelection(items) {
+            items.forEach((item, index) => {
+                item.classList.toggle('active', index === selectedIndex);
+            });
+            if (selectedIndex >= 0) {
+                items[selectedIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        // Debounce-функція для затримки запитів
+        function debounce(func, wait) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        // Існуючий обробник blur (залишаємо без змін, додаємо після нього triggerBlurEvent)
+        serialInput.addEventListener('blur', (e) => {
+            const serialNum = e.target.value.trim();
+            if (serialNum) {
+                let isModalOpen = processModal._isShown;
+                fetch('/check_cartridge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serial_num: serialNum })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (isModalOpen) {
+                        if (data.success && data.latest_status) {
+                            document.getElementById('status').value = data.latest_status.status || '0';
+                            document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
+                            document.getElementById('exec_dept').value = data.latest_status.exec_dept || '';
+                            document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
+                        } else {
+                            const label = document.querySelector('label[for="serial_num"]');
+                            label.classList.add('double-blink');
+                            setTimeout(() => label.classList.remove('double-blink'), 1200);
+                            document.getElementById('serial_num').focus();
+                            document.getElementById('serial_num').select();
+                        }
+                    }
+                })
+                .catch(error => {
+                    if (isModalOpen) {
+                        const label = document.querySelector('label[for="serial_num"]');
+                        label.classList.add('double-blink');
+                        setTimeout(() => label.classList.remove('double-blink'), 1200);
+                        document.getElementById('serial_num').focus();
+                        document.getElementById('serial_num').select();
+                    }
+                });
+            }
+        });
+
+        // Функція для програмного виклику blur
+        function triggerBlurEvent() {
+            const event = new Event('blur');
+            serialInput.dispatchEvent(event);
+        }
+
+        // Очищення dropdown при закритті модального вікна
+        document.getElementById('processModal').addEventListener('hidden.bs.modal', () => {
+            processModal._isShown = false;
+            suggestionsDropdown.innerHTML = '';
+            suggestionsDropdown.classList.remove('show');
+        });
+
+
+//***************************************************
 
         function fetchInTransitCartridges() {
             fetch('/api/in_transit_cartridges', {
