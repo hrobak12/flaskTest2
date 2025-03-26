@@ -15,6 +15,8 @@ class User(db.Model, UserMixin):
     username: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     humanname: Mapped[str] = mapped_column(String(60), nullable=False)
+# Нове поле. Треба для друку адреси на ярликах
+#    dept_id: Mapped[int] = mapped_column(ForeignKey('refill_dept.id'), nullable=False)
     lastlogin: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     active: Mapped[bool] = mapped_column(default=True)
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
@@ -59,6 +61,8 @@ class Cartridges(db.Model):
     cartridge_model: Mapped[str] = mapped_column(String(255), nullable=True)  # Текстове поле
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
+# Нове поле. Потрібне щоб зразу знати статус картриджа, а не перебирати таблицю історії
+#    curr_status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 class CartridgeStatus(db.Model):
     __tablename__ = "cartrg_status"
