@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from sqlalchemy import Index
 from sqlalchemy.sql.expression import literal
 from datetime import datetime
-from flask_login import UserMixin
+from flask_login import UserMixin, current_user
 
 db = SQLAlchemy()
 
@@ -16,7 +16,7 @@ class User(db.Model, UserMixin):
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     humanname: Mapped[str] = mapped_column(String(60), nullable=False)
 # Нове поле. Треба для друку адреси на ярликах
-#    dept_id: Mapped[int] = mapped_column(ForeignKey('refill_dept.id'), nullable=False)
+    dept_id: Mapped[int] = mapped_column(ForeignKey('refill_dept.id'), nullable=False)
     lastlogin: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     active: Mapped[bool] = mapped_column(default=True)
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())

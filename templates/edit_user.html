@@ -16,6 +16,14 @@
             <input type="text" class="form-control" id="humanname" name="humanname" value="{{ user.humanname }}" required maxlength="60">
         </div>
         <div class="mb-3">
+            <label for="dept_id" class="form-label">Відділ</label>
+            <select class="form-select" id="dept_id" name="dept_id" required>
+                {% for dept in depts %}
+                    <option value="{{ dept.id }}" {% if user.dept_id == dept.id %}selected{% endif %}>{{ dept.deptname }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
             <label for="role" class="form-label">Роль</label>
             <select class="form-select" id="role" name="role" required>
                 <option value="user" {% if user.role == 'user' %}selected{% endif %}>Користувач</option>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Обробка картриджів{% endblock %}
 {% block content %}
-    <h1>Обробка картриджів</h1>
+   <h1>Обробка картриджів</h1>
    <h2><a href="#" class="process-link" onclick="processModal.show(); return false;">Натисніть сюди</a> або F2 для обробки картриджів</h2>
 
     <!-- Модальне вікно для обробки -->
@@ -65,70 +65,79 @@
     </div>
 
 <!-- Модальне вікно для історії дій -->
-<div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-secondary text-white">
-                <h5 class="modal-title" id="historyModalLabel">Історія дій для картриджа</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Дата</th>
-                            <th>Статус</th>
-                            <th>Відділ</th>
-                            <th>Трек-номер</th>
-                            <th>Оновлено користувачем</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-table-body">
-                        <!-- Дані завантажуються через JS -->
-                    </tbody>
-                </table>
-            </div>
-            <div class="modal-footer">
-                <a href="#" id="exportHistoryBtn" class="btn btn-excel">Звіт</a>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-    <!-- Таблиця картриджів "В дорозі" -->
-    <div class="mt-5">
-        <div class="d-flex justify-content-between align-items-center ">
-            <h3>Картриджі в дорозі</h3>
-            <div>
-                <a href="/generate_shipping_label" class="btn btn-acrobat">Ярлик</a>
-                <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-body p-0">
-                <div style="max-height: 300px; overflow-y: auto;">
-                    <table class="table table-striped mb-0" id="in-transit-table">
-                        <thead class="sticky-header">
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="historyModalLabel">Історія дій для картриджа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-striped">
+                        <thead>
                             <tr>
-                                <th class="col-id">ID</th>
-                                <th class="col-serial">Серійний номер</th>
-                                <th class="col-model">Модель картриджа</th>
-                                <th class="col-date">Дата відправки</th>
-                                <th class="col-dept">Відділ (куди)</th>
-                                <th class="col-track">Трек-номер</th>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                                <th>Відділ</th>
+                                <th>Трек-номер</th>
+                                <th>Оновлено користувачем</th>
                             </tr>
                         </thead>
-                        <tbody id="in-transit-table-body">
+                        <tbody id="history-table-body">
                             <!-- Дані завантажуються через JS -->
                         </tbody>
                     </table>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" id="exportHistoryBtn" class="btn btn-excel">Звіт</a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Таблиця картриджів "На зберіганні" -->
+<!-- Таблиця картриджів "В дорозі" -->
+<div class="mt-5">
+    <div class="d-flex justify-content-between align-items-center">
+        <h3>Картриджі в дорозі</h3>
+        <div class="d-flex gap-2"> <!-- Вирівнюємо кнопки в ряд із відступом -->
+            <!-- Кнопка "Адреса" з випадаючим меню -->
+            <div class="dropdown">
+                <button class="btn btn-ukrposhta dropdown-toggle" type="button" id="addressDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Адреса
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="addressDropdown">
+                    <li><a class="dropdown-item" href="/generate_shipping_label" target="_blank">Друкувати ярлик</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="alert('Ця функція ще не реалізована'); return false;">Вказати штрих-код</a></li>
+                </ul>
+            </div>
+            <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body p-0">
+            <div style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-striped mb-0" id="in-transit-table">
+                    <thead class="sticky-header">
+                        <tr>
+                            <th class="col-id">ID</th>
+                            <th class="col-serial">Серійний номер</th>
+                            <th class="col-model">Модель картриджа</th>
+                            <th class="col-date">Дата відправки</th>
+                            <th class="col-dept">Відділ (куди)</th>
+                            <th class="col-track">Трек-номер</th>
+                        </tr>
+                    </thead>
+                    <tbody id="in-transit-table-body">
+                        <!-- Дані завантажуються через JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
     <!-- Таблиця картриджів "На зберіганні" -->
     <div class="mt-4">
         <div class="d-flex justify-content-between align-items-center">
@@ -217,6 +226,21 @@
         border-color: #d30d02;
         color: white;
     }
+
+    .btn-ukrposhta {
+        background-color: #FFC107;
+        color: #000; /* Чорний текст для контрасту */
+    }
+
+    .btn-ukrposhta:hover {
+        background-color: #FFB300; /* Трохи темніший відтінок для ефекту наведення */
+    }
+
+    /* Зберігаємо колір при відкритому меню */
+    .btn-ukrposhta.dropdown-toggle.show {
+        background-color: #FFB300 !important; /* Колір як при :hover */
+        color: #000 !important;
+
     .serial-suggestions.show {
         display: block;
     }

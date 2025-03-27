@@ -4,11 +4,13 @@
 # Замість поля "Дата" додати випадаючий список "Принтер", який залежить від
 # випадаючого списку "Відділ (необов’язково)"
 # випадаючий список "Відділ (необов’язково)" зробити обов'язковим для заповнення
+
 # при успішному додаванні події оновлювати запис у таблиці "Cartridges" для
-# вибраного картриджа і змінювати принтер, на той куди його поставили
-# тобто поле "in_printer"
-# додати поле curr_status: Mapped[int] до таблиці "Cartridges" і також його
-# міняти при зміні події для картрижа
+# вибраного картриджа і змінювати принтер, на той куди його поставили, тобто поле "in_printer"
+# це поле може бути порожнім
+
+# додати поле curr_status: Mapped[int] до таблиці "Cartridges" і також його міняти при зміні події для картрижа
+# для того щоб не перелопачувати постійно таблицю подій у пошуках останнього стану
 
 #!події в обробці картриджів записуються з неправильним часовим поясом. Суто GMT
 
@@ -70,25 +72,10 @@ def admin_required(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
-# Ініціалізація бази даних і створення початкового користувача
-with app.app_context():
-    db.create_all()
-    admin_user = User.query.filter_by(username='admin').first()
-    if not admin_user:
-        admin_password = hash_password('admin')
-        admin = User(username='admin', password=admin_password, humanname='Administrator', role='admin')
-        db.session.add(admin)
-        db.session.commit()
-        print("Користувач admin створений!")
-    else:
-        print("Користувач admin уже існує.")
+#*************
+#тут може бути скрипт міграції, якщо потрібно
+#*************
 
-        # Використовуємо text() для сирих SQL-запитів
-        db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_cartridge_date ON cartrg_status (cartridge_id, date_ofchange)"))
-        db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_status ON cartrg_status (status)"))
-        db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_exec_dept ON cartrg_status (exec_dept)"))
-        db.session.commit()
-        print("Індекси створено або вже існують.")
 
 @app.route('/')
 @app.route('/index')
@@ -578,7 +565,8 @@ def event_log():
 def users():
     search = request.args.get('search', '')
     users_list = User.query.filter(User.username.ilike(f'%{search}%')).all()
-    return render_template('users.html', users=users_list, search=search)
+    return render_template('users.html', users=users_list, search=search, RefillDept=RefillDept)
+
 
 @app.route('/add_user', methods=['GET', 'POST'])
 @admin_required
@@ -589,16 +577,17 @@ def add_user():
         password = request.form['password']
         humanname = request.form['humanname']
         role = request.form['role']
+        dept_id = request.form['dept_id']  # Додаємо dept_id
         if User.query.filter_by(username=username).first():
             flash('Користувач із таким логіном уже існує!')
-            return render_template('add_user.html')
+            return render_template('add_user.html', depts=RefillDept.query.all())
         hashed_password = hash_password(password)
-        new_user = User(username=username, password=hashed_password, humanname=humanname, role=role)
+        new_user = User(username=username, password=hashed_password, humanname=humanname, role=role, dept_id=dept_id)
         db.session.add(new_user)
         db.session.commit()
         flash('Користувача додано!')
         return redirect(url_for('users'))
-    return render_template('add_user.html')
+    return render_template('add_user.html', depts=RefillDept.query.all())  # Передаємо список відділів
 
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @admin_required
@@ -609,19 +598,19 @@ def edit_user(user_id):
         username = request.form['username']
         if User.query.filter(User.username == username, User.id != user_id).first():
             flash('Користувач із таким іменем уже існує!')
-            return render_template('edit_user.html', user=user)
+            return render_template('edit_user.html', user=user, depts=RefillDept.query.all())
         user.username = username
-        if request.form['password']:  # Оновлюємо пароль лише якщо введено
+        if request.form['password']:
             user.password = bcrypt.hashpw(request.form['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         user.humanname = request.form['humanname']
         user.role = request.form['role']
-        # Виправлення: явно перевіряємо наявність 'active'
-        user.active = 'active' in request.form  # True якщо прапорець увімкнено, False якщо знято
+        user.dept_id = request.form['dept_id']  # Додаємо dept_id
+        user.active = 'active' in request.form
         user.time_updated = datetime.now()
         db.session.commit()
         flash('Користувача оновлено!')
         return redirect(url_for('users'))
-    return render_template('edit_user.html', user=user)
+    return render_template('edit_user.html', user=user, depts=RefillDept.query.all())  # Передаємо список відділів
 
 @app.route('/delete_user/<int:user_id>', methods=['POST'])
 @admin_required
@@ -1205,6 +1194,9 @@ pdfmetrics.registerFont(TTFont('TimesNewRomanBold', 'static/ttf/Timesbd.ttf'))  
 @app.route('/generate_shipping_label', methods=['GET'])
 @login_required
 def generate_shipping_label():
+    # Отримуємо відділ поточного користувача
+    dept = RefillDept.query.get_or_404(current_user.dept_id)
+
     # Створюємо буфер для PDF
     buffer = BytesIO()
     textoffset = -75
@@ -1218,15 +1210,17 @@ def generate_shipping_label():
     p.drawCentredString(width / 2, textoffset + height - 50, "ОБЕРЕЖНО!!!")
     p.drawCentredString(width / 2, textoffset + height - 90, "НЕ КИДАТИ!!!")
 
-    # Адреса відправника (ВСПІТ) зліва
+    # Адреса відправника з dept_id поточного користувача зліва
     p.setFont("TimesNewRoman", 12)
     p.drawString(50, textoffset + height - 200, "Відправник:")
-    p.drawString(50, textoffset + height - 220, "ВСПІТ")
-    p.drawString(50, textoffset + height - 240, "вул. Прикладна, 1")
-    p.drawString(50, textoffset + height - 260, "м. Київ, 01001")
-    p.drawString(50, textoffset + height - 280, "Україна")
+    p.drawString(50, textoffset + height - 220, dept.deptname or "Не вказано")
+    p.drawString(50, textoffset + height - 240, dept.addr1 or "")
+    p.drawString(50, textoffset + height - 260, dept.addr2 or "")
+    p.drawString(50, textoffset + height - 280, dept.addr3 or "")
+    p.drawString(50, textoffset + height - 300, dept.addr4 or "")
+    p.drawString(50, textoffset + height - 320, dept.addr5 or "")
 
-    # Адреса одержувача (інший відділ) справа
+    # Адреса одержувача (інший відділ) справа (залишаємо статичною для прикладу)
     p.drawString(width - 250, textoffset + height - 350, "Одержувач:")
     p.drawString(width - 250, textoffset + height - 370, "Відділ продажів")
     p.drawString(width - 250, textoffset + height - 390, "вул. Інша, 10")
