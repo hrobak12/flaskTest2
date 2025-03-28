@@ -10,6 +10,7 @@
             </button>
         </div>
         <div>
+            <a href="{{ url_for('export_cartridges_table') }}" class="btn btn-excel me-2">Звіт</a> <!-- Додано кнопку "Звіт" -->
             <a href="{{ url_for('add_cartridge') }}" class="btn btn-success me-2">Додати картридж</a>
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
         </div>
@@ -74,6 +75,15 @@
         }
         #clear-search {
             padding: 0.25rem 0.5rem; /* Відступи як у btn-sm */
+        }
+        .btn-excel {
+            background-color: #1D6F42;
+            color: white;
+            border: none;
+        }
+        .btn-excel:hover {
+            background-color: #155932;
+            color: white;
         }
     </style>
 {% endblock %}

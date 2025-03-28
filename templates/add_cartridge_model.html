@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Додати модель картриджа{% endblock %}
+{% block content %}
+    <h1>Додати модель картриджа</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="model_name" class="form-label">Назва моделі</label>
+            <input type="text" class="form-control" id="model_name" name="model_name" required>
+        </div>
+        <div class="mb-3">
+            <label for="model_type" class="form-label">Тип картриджа</label>
+            <select class="form-select" id="model_type" name="model_type" required>
+                <option value="0">Тонер + барабан</option>
+                <option value="1">Тільки тонер</option>
+                <option value="2">Тільки барабан</option>
+                <option value="3">Стрічка</option>
+                <option value="4">Чорнила</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="printer_model_id" class="form-label">Модель принтера (необов’язково)</label>
+            <select class="form-select" id="printer_model_id" name="printer_model_id">
+                <option value="">Не вказано</option>
+                {% for printer in printer_models %}
+                    <option value="{{ printer.id }}">{{ printer.model_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Додати</button>
+        <a href="{{ url_for('cartridge_models') }}" class="btn btn-secondary">Скасувати</a>
+    </form>
+{% endblock %}

@@ -77,9 +77,18 @@ class CartridgeStatus(db.Model):
     #індекси
     __table_args__ = (
         Index('idx_cartridge_date', 'cartridge_id', 'date_ofchange'),  # Композитний індекс
-        Index('idx_status', 'status'),                                # Окремий індекс для status
-        Index('idx_exec_dept', 'exec_dept'),                          # Окремий індекс для exec_dept
+        Index('idx_status', 'status'),                                 # Окремий індекс для status
+        Index('idx_exec_dept', 'exec_dept'),                           # Окремий індекс для exec_dept
     )
+
+class CartridgeModel(db.Model):
+    __tablename__ = 'cartrg_model'
+    id = mapped_column(db.Integer, primary_key=True)
+    model_name = mapped_column(db.String(128), nullable=False, unique=True)
+    model_type = mapped_column(db.Integer, nullable=False)  # 0: Тонер+барабан, 1: Тонер, 2: Барабан, 3: Стрічка, 4: Чорнила
+    printer_model_id = mapped_column(db.Integer, db.ForeignKey('model_print.id'), nullable=True)  # Прив’язка до принтера
+    user_updated = mapped_column(db.Integer, db.ForeignKey('users.id'))
+    time_updated = mapped_column(db.DateTime)
 
 
 class EventLog(db.Model):

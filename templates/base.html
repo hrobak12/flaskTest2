@@ -36,6 +36,7 @@
                             <ul class="dropdown-menu" aria-labelledby="navbarDropdownRefs">
                                 <li><a class="dropdown-item" href="{{ url_for('equipments') }}">Обладнання</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('printer_models') }}">Моделі принтерів</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('cartridge_models') }}">Моделі картриджів</a></li> <!-- Додано пункт -->
                                 <li><a class="dropdown-item" href="{{ url_for('refill_depts') }}">Відділи</a></li>
                                 {% if current_user.role == 'admin' %}
                                     <li><a class="dropdown-item" href="{{ url_for('users') }}">Користувачі</a></li>

@@ -13,7 +13,7 @@
 # для того щоб не перелопачувати постійно таблицю подій у пошуках останнього стану
 
 # кнопку Звіт у "Списку картриджів" і сортування по моделі!
-# треба додати моделі картриджів! писати вручну погано.
+# треба додати таблицю моделей картриджів! писати вручну погано.
 # у деяких принтерах буває 2 картриджі: драм і тонер. треба реалізувати.
 
 
@@ -39,7 +39,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, abo
 from sqlalchemy import func, and_
 from sqlalchemy.sql import text  # Додаємо імпорт text
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog
+from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel
 from datetime import datetime
 import bcrypt
 from openpyxl import Workbook
@@ -628,6 +628,84 @@ def delete_user(user_id):
     flash('Користувача видалено!')
     return redirect(url_for('users'))
 
+
+# CRUD для CartridgeModel
+@app.route('/cartridge_models')
+@login_required
+def cartridge_models():
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Кількість записів на сторінці
+    query = CartridgeModel.query.filter(CartridgeModel.model_name.ilike(f'%{search}%'))
+    pagination = query.paginate(page=page, per_page=per_page)
+    return render_template('cartridge_models.html',
+                           models=pagination.items,
+                           pagination=pagination,
+                           search=search,
+                           PrinterModel=PrinterModel)  # Додаємо PrinterModel для відображення назви принтера
+
+@app.route('/add_cartridge_model', methods=['GET', 'POST'])
+@admin_required
+@login_required
+def add_cartridge_model():
+    if request.method == 'POST':
+        model_name = request.form['model_name']
+        if CartridgeModel.query.filter_by(model_name=model_name).first():
+            flash('Модель із такою назвою вже існує!')
+            return render_template('add_cartridge_model.html', printer_models=PrinterModel.query.all())
+        model_type = int(request.form['model_type'])
+        printer_model_id = request.form['printer_model_id'] or None  # Додаємо вибір моделі принтера
+        model = CartridgeModel(
+            model_name=model_name,
+            model_type=model_type,
+            printer_model_id=printer_model_id,  # Прив’язка до моделі принтера
+            user_updated=current_user.id,
+            time_updated=datetime.utcnow()
+        )
+        db.session.add(model)
+        db.session.commit()
+        flash('Модель картриджа додано!')
+        return redirect(url_for('cartridge_models'))
+    return render_template('add_cartridge_model.html', printer_models=PrinterModel.query.all())  # Передаємо список моделей принтерів
+
+@app.route('/edit_cartridge_model/<int:model_id>', methods=['GET', 'POST'])
+@admin_required
+@login_required
+def edit_cartridge_model(model_id):
+    model = CartridgeModel.query.get_or_404(model_id)
+    if request.method == 'POST':
+        model_name = request.form['model_name']
+        if CartridgeModel.query.filter(CartridgeModel.model_name == model_name, CartridgeModel.id != model_id).first():
+            flash('Модель із такою назвою вже існує!')
+            return render_template('edit_cartridge_model.html', model=model, printer_models=PrinterModel.query.all())
+        model.model_name = model_name
+        model.model_type = int(request.form['model_type'])
+        model.printer_model_id = request.form['printer_model_id'] or None  # Оновлюємо прив’язку до принтера
+        model.user_updated = current_user.id
+        model.time_updated = datetime.utcnow()
+        db.session.commit()
+        flash('Модель оновлено!')
+        return redirect(url_for('cartridge_models'))
+    return render_template('edit_cartridge_model.html', model=model, printer_models=PrinterModel.query.all())  # Передаємо список моделей принтерів
+
+@app.route('/delete_cartridge_model/<int:model_id>', methods=['POST'])
+@admin_required
+@login_required
+def delete_cartridge_model(model_id):
+    model = CartridgeModel.query.get_or_404(model_id)
+    db.session.delete(model)
+    event = EventLog(
+        table_name='cartrg_model',
+        event_type=3,  # Видалення
+        user_updated=current_user.id
+    )
+    db.session.add(event)
+    db.session.commit()
+    flash('Модель видалено!')
+    return redirect(url_for('cartridge_models'))
+
+
+
 @app.route('/add_cartridge_event', methods=['POST'])
 @login_required
 def add_cartridge_event():
@@ -1180,9 +1258,59 @@ def export_equipments_table():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+@app.route('/export/cartridges_table', methods=['GET'])
+@login_required
+def export_cartridges_table():
+    search = request.args.get('search', '')
 
+    query = Cartridges.query
+    if search:
+        query = query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
+    cartridges = query.all()
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Список картриджів"
+    headers = ["ID", "Серійний номер", "Модель картриджа", "У принтері"]
+    ws.append(headers)
+
+    for cartridge in cartridges:
+        in_printer_info = "Немає"
+        if cartridge.in_printer:
+            equipment = CustomerEquipment.query.get(cartridge.in_printer)
+            if equipment:
+                printer_model = PrinterModel.query.get(equipment.print_model)
+                dept = RefillDept.query.get(equipment.print_dept)
+                in_printer_info = f"{printer_model.model_name} ({dept.deptname})"
+        ws.append([cartridge.id, cartridge.serial_num, cartridge.cartridge_model or "Не вказано", in_printer_info])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл у пам’яті
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Формуємо назву файлу
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Список_картриджів_{timestamp}.xlsx"
+
+    return send_file(output, download_name=filename, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+#*******************************************************************
 #це тестовий pdf
-
 from reportlab.lib.pagesizes import A4, A5, landscape, portrait
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
@@ -1246,7 +1374,7 @@ def generate_shipping_label(dept_id):
     # Повертаємо PDF як відповідь
     buffer.seek(0)
     return Response(buffer.getvalue(), mimetype='application/pdf',
-                    headers={"Content-Disposition": "attachment;filename=shipping_label.pdf"})
+                    headers={"Content-Disposition": "attachment;filename=shipping_label_"+str(dept_id)+".pdf"})
 
 
 if __name__ == '__main__':

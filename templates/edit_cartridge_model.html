@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Редагувати модель картриджа{% endblock %}
+{% block content %}
+    <h1>Редагувати модель картриджа</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="model_name" class="form-label">Назва моделі</label>
+            <input type="text" class="form-control" id="model_name" name="model_name" value="{{ model.model_name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="model_type" class="form-label">Тип картриджа</label>
+            <select class="form-select" id="model_type" name="model_type" required>
+                <option value="0" {% if model.model_type == 0 %}selected{% endif %}>Тонер + барабан</option>
+                <option value="1" {% if model.model_type == 1 %}selected{% endif %}>Тільки тонер</option>
+                <option value="2" {% if model.model_type == 2 %}selected{% endif %}>Тільки барабан</option>
+                <option value="3" {% if model.model_type == 3 %}selected{% endif %}>Стрічка</option>
+                <option value="4" {% if model.model_type == 4 %}selected{% endif %}>Чорнила</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="printer_model_id" class="form-label">Модель принтера (необов’язково)</label>
+            <select class="form-select" id="printer_model_id" name="printer_model_id">
+                <option value="" {% if not model.printer_model_id %}selected{% endif %}>Не вказано</option>
+                {% for printer in printer_models %}
+                    <option value="{{ printer.id }}" {% if model.printer_model_id == printer.id %}selected{% endif %}>{{ printer.model_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Оновити</button>
+        <a href="{{ url_for('cartridge_models') }}" class="btn btn-secondary">Скасувати</a>
+    </form>
+{% endblock %}
