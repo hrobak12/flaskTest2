@@ -12,10 +12,13 @@
 # додати поле curr_status: Mapped[int] до таблиці "Cartridges" і також його міняти при зміні події для картрижа
 # для того щоб не перелопачувати постійно таблицю подій у пошуках останнього стану
 
-#!події в обробці картриджів записуються з неправильним часовим поясом. Суто GMT
+# кнопку Звіт у "Списку картриджів" і сортування по моделі!
+# треба додати моделі картриджів! писати вручну погано.
+# у деяких принтерах буває 2 картриджі: драм і тонер. треба реалізувати.
 
 
-
+#28.03.25
+#Додано друк адресних ярликів з кнопки на сторінці обробки картриджів та у модальному вікні додавання подій
 
 #24.03.25
 #Поміняно значення статусів
@@ -1180,7 +1183,7 @@ def export_equipments_table():
 
 #це тестовий pdf
 
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4, A5, landscape, portrait
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -1191,43 +1194,51 @@ from reportlab.lib import colors
 pdfmetrics.registerFont(TTFont('TimesNewRoman', 'static/ttf/Times.ttf'))  # Шлях до файлу шрифту
 pdfmetrics.registerFont(TTFont('TimesNewRomanBold', 'static/ttf/Timesbd.ttf'))  # Шлях до файлу шрифту
 
-@app.route('/generate_shipping_label', methods=['GET'])
+@app.route('/generate_shipping_label/<int:dept_id>', methods=['GET'])
 @login_required
-def generate_shipping_label():
-    # Отримуємо відділ поточного користувача
-    dept = RefillDept.query.get_or_404(current_user.dept_id)
+def generate_shipping_label(dept_id):
+    # Отримуємо відділ відправника (з dept_id поточного користувача)
+    sender_dept = RefillDept.query.get_or_404(current_user.dept_id)
+    # Отримуємо відділ одержувача (з переданим dept_id)
+    receiver_dept = RefillDept.query.get_or_404(dept_id)
 
     # Створюємо буфер для PDF
     buffer = BytesIO()
-    textoffset = -75
+    textoffset = 20  # Відступ зверху
 
-    # Ініціалізуємо PDF на розмір A4 в альбомній орієнтації
-    p = canvas.Canvas(buffer, pagesize=landscape(A4))
-    width, height = landscape(A4)  # 842 x 595 пунктів (альбомна A4)
+    # Ініціалізуємо PDF на розмір A4 у портретній орієнтації
+    p = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4  # 595 x 842 пунктів (портретна A4)
+    half_height = height - height / 4.5
 
     # Заголовок "ОБЕРЕЖНО!!! НЕ КИДАТИ!!!"
-    p.setFont("TimesNewRomanBold", 36)  # Використовуємо шрифт із кирилицею
-    p.drawCentredString(width / 2, textoffset + height - 50, "ОБЕРЕЖНО!!!")
-    p.drawCentredString(width / 2, textoffset + height - 90, "НЕ КИДАТИ!!!")
+    p.setFont("TimesNewRomanBold", 24)
+    p.drawCentredString(width / 2, half_height + textoffset + 110, "ОБЕРЕЖНО!!!")
+    p.drawCentredString(width / 2, half_height + textoffset + 80, "НЕ КИДАТИ!!!")
 
-    # Адреса відправника з dept_id поточного користувача зліва
+    # Адреса відправника (зліва, ближче до краю)
     p.setFont("TimesNewRoman", 12)
-    p.drawString(50, textoffset + height - 200, "Відправник:")
-    p.drawString(50, textoffset + height - 220, dept.deptname or "Не вказано")
-    p.drawString(50, textoffset + height - 240, dept.addr1 or "")
-    p.drawString(50, textoffset + height - 260, dept.addr2 or "")
-    p.drawString(50, textoffset + height - 280, dept.addr3 or "")
-    p.drawString(50, textoffset + height - 300, dept.addr4 or "")
-    p.drawString(50, textoffset + height - 320, dept.addr5 or "")
+    p.drawString(20, half_height + textoffset - 10, "Відправник:")
+    p.drawString(20, half_height + textoffset - 25, sender_dept.deptname or "")
+    p.drawString(20, half_height + textoffset - 40, sender_dept.addr1 or "")
+    p.drawString(20, half_height + textoffset - 55, sender_dept.addr2 or "")
+    p.drawString(20, half_height + textoffset - 70, sender_dept.addr3 or "")
+    p.drawString(20, half_height + textoffset - 85, sender_dept.addr4 or "")
+    p.drawString(20, half_height + textoffset - 100, sender_dept.addr5 or "")
 
-    # Адреса одержувача (інший відділ) справа (залишаємо статичною для прикладу)
-    p.drawString(width - 250, textoffset + height - 350, "Одержувач:")
-    p.drawString(width - 250, textoffset + height - 370, "Відділ продажів")
-    p.drawString(width - 250, textoffset + height - 390, "вул. Інша, 10")
-    p.drawString(width - 250, textoffset + height - 410, "м. Львів, 79000")
-    p.drawString(width - 250, textoffset + height - 430, "Україна")
+    horiz_offset=268
+    # Адреса одержувача (справа, зсунено вліво на 1 см)
+    p.drawString(width - horiz_offset, half_height + textoffset - 130, "Одержувач:")  # Змінено з -220 на -248
+    p.drawString(width - horiz_offset, half_height + textoffset - 145, receiver_dept.deptname or "Не вказано")
+    p.drawString(width - horiz_offset, half_height + textoffset - 160, receiver_dept.addr1 or "")
+    p.drawString(width - horiz_offset, half_height + textoffset - 175, receiver_dept.addr2 or "")
+    p.drawString(width - horiz_offset, half_height + textoffset - 190, receiver_dept.addr3 or "")
+    p.drawString(width - horiz_offset, half_height + textoffset - 205, receiver_dept.addr4 or "")
+    p.drawString(width - horiz_offset, half_height + textoffset - 220, receiver_dept.addr5 or "")
 
-    p.drawString(50, textoffset + height - 480, "Номер заявки OTRS ______________________")
+    # Номер заявки OTRS (знизу верхньої частини)
+    p.drawString(20, half_height + textoffset - 240, "Номер заявки OTRS ______________________")
+
     # Завершуємо PDF
     p.showPage()
     p.save()

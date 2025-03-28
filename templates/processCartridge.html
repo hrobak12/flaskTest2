@@ -14,12 +14,6 @@
                 </div>
                 <div class="modal-body">
                     <form id="processForm">
-<!--
-                        <div class="mb-3">
-                            <label for="serial_num" class="form-label">Серійний номер</label>
-                            <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Введіть або відскануйте" required autofocus>
-                        </div>
--->
                         <div class="mb-3 position-relative">
                             <label for="serial_num" class="form-label">Серійний номер</label>
                             <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Введіть або відскануйте" required autofocus>
@@ -57,6 +51,7 @@
                     </form>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-ukrposhta me-auto" id="printLabelBtn">Друкувати ярлик</button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
                     <button type="button" class="btn btn-primary" id="confirmProcess">Підтвердити</button>
                 </div>
@@ -96,6 +91,34 @@
         </div>
     </div>
 
+<!-- Модальне вікно для друку адресного ярлика -->
+<div class="modal fade" id="printLabelModal" tabindex="-1" aria-labelledby="printLabelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="printLabelModalLabel">Друкувати адресний ярлик</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="receiver_dept" class="form-label">Виберіть відділ одержувач</label>
+                    <select class="form-select" id="receiver_dept" name="receiver_dept" required>
+                        <option value="">Не вказано</option>
+                        {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
+                            <option value="{{ dept.id }}">{{ dept.deptname }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ukrposhta" id="printLabelConfirmBtn">Друкувати</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <!-- Таблиця картриджів "В дорозі" -->
 <div class="mt-5">
     <div class="d-flex justify-content-between align-items-center">
@@ -107,7 +130,7 @@
                     Адреса
                 </button>
                 <ul class="dropdown-menu" aria-labelledby="addressDropdown">
-                    <li><a class="dropdown-item" href="/generate_shipping_label" target="_blank">Друкувати ярлик</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printLabelModal.show(); return false;">Друкувати ярлик</a></li>
                     <li><a class="dropdown-item" href="#" onclick="alert('Ця функція ще не реалізована'); return false;">Вказати штрих-код</a></li>
                 </ul>
             </div>
@@ -493,6 +516,19 @@
             }
         });
 
+        // Додаємо обробник для кнопки "Друкувати ярлик"
+        document.getElementById('printLabelBtn').addEventListener('click', () => {
+            const deptId = document.getElementById('exec_dept').value;
+            if (deptId) {
+                // Формуємо URL із обраним dept_id і відкриваємо в новій вкладці
+                const url = `/generate_shipping_label/${deptId}`;
+                window.open(url, '_blank');
+            } else {
+                alert('Будь ласка, виберіть відділ у списку "Відділ (необов’язково)"');
+            }
+        });
+
+
         document.getElementById('serial_num').addEventListener('blur', (e) => {
             const serialNum = e.target.value.trim();
             if (serialNum) {
@@ -597,5 +633,21 @@
                 tbody.appendChild(row);
             });
         }
+
+        // Ініціалізація нового модального вікна для друку ярликів
+        const printLabelModal = new bootstrap.Modal(document.getElementById('printLabelModal'));
+
+        // Обробник для кнопки "Друкувати" у новому модальному вікні
+        document.getElementById('printLabelConfirmBtn').addEventListener('click', () => {
+            const deptId = document.getElementById('receiver_dept').value;
+            if (deptId) {
+                const url = `/generate_shipping_label/${deptId}`;
+                window.open(url, '_blank');
+                printLabelModal.hide(); // Закриваємо модальне вікно після друку
+            } else {
+                alert('Будь ласка, виберіть відділ одержувач');
+            }
+        });
+
     </script>
 {% endblock %}
