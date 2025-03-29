@@ -9,10 +9,11 @@
 # вибраного картриджа і змінювати принтер, на той куди його поставили, тобто поле "in_printer"
 # це поле може бути порожнім
 
-# додати поле curr_status: Mapped[int] до таблиці "Cartridges" і також його міняти при зміні події для картрижа
-# для того щоб не перелопачувати постійно таблицю подій у пошуках останнього стану
+# реалізовано:  додати поле curr_status: Mapped[int] до таблиці "Cartridges"
+# реалізовано:  і також його міняти при зміні події для картрижа
+# реалізовано:  для того щоб не перелопачувати постійно таблицю подій у пошуках останнього стану
 
-# кнопку Звіт у "Списку картриджів" і сортування по моделі!
+# реалізовано: кнопку Звіт у "Списку картриджів" і сортування по моделі!
 # реалізовано: додати таблицю моделей картриджів! писати вручну погано.
 
 # у деяких принтерах буває 2 картриджі: драм і тонер. треба реалізувати.
@@ -731,10 +732,25 @@ def add_cartridge_event():
         user_updated=current_user.id,
         time_updated=datetime.now()
     )
-    db.session.add(new_status)
-    db.session.commit()
+
+#    db.session.add(new_status)
+#    cartridge.curr_status = int(status)  # Синхронізуємо статус
+#    cartridge.user_updated = current_user.id  # Оновлюємо користувача
+#    cartridge.time_updated = datetime.now()  # Оновлюємо час
+#    # Комітимо всі зміни в базі
+#    db.session.commit()
+    try:
+        db.session.add(new_status)
+        cartridge.curr_status = int(status)
+        cartridge.user_updated = current_user.id
+        cartridge.time_updated = datetime.now()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Помилка: {str(e)}'})
 
     return jsonify({'success': True})
+
 
 
 @app.route('/processCartridge')
@@ -774,7 +790,7 @@ def api_cartridges():
     page = request.args.get('page', 1, type=int)
     per_page = 10
 
-    query = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
+    query = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%')).order_by(Cartridges.cartridge_model.asc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
     cartridges_data = []
@@ -794,7 +810,8 @@ def api_cartridges():
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
             'cartridge_model': cartridge.cartridge_model,
-            'in_printer_info': in_printer_info
+            'in_printer_info': in_printer_info,
+            'curr_status': cartridge.curr_status  # Переконайся, що це є
         })
 
     pagination_data = {
