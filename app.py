@@ -688,6 +688,11 @@ def add_cartridge_event():
     if not exec_dept:
         return jsonify({'success': False, 'message': 'Виберіть відділ!'})
 
+    # Перевірка на дублювання статусу
+    if cartridge.curr_status == int(status):
+        return jsonify({'success': False, 'message': 'Цей статус уже встановлено для картриджа!'})
+
+
     # Додавання події в CartridgeStatus
     new_status = CartridgeStatus(
         cartridge_id=cartridge.id,

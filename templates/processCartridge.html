@@ -295,6 +295,8 @@
         const suggestionsDropdown = document.getElementById('serial-suggestions');
         const execDeptSelect = document.getElementById('exec_dept');
         const printerSelect = document.getElementById('printer');
+        const statusSelect = document.getElementById('status');
+
         let selectedIndex = -1;
 
         // Обробка введення серійного номера
@@ -560,7 +562,7 @@
             }
         });
 
-        // Відправка форми
+        // Відправка форми з підсвіткою помилки для статусу
         function submitForm() {
             const formData = new FormData(document.getElementById('processForm'));
             fetch('/add_cartridge_event', {
@@ -579,11 +581,79 @@
                         fetchCartridges(document.getElementById('search').value.trim(), 1);
                     }
                 } else {
-                    alert('Помилка: ' + data.message);
+                    if (data.message === 'Цей статус уже встановлено для картриджа!') {
+                        const statusLabel = document.querySelector('label[for="status"]');
+                        statusLabel.classList.add('double-blink');
+                        setTimeout(() => statusLabel.classList.remove('double-blink'), 1200);
+                        statusSelect.focus();
+                    } else {
+                        alert('Помилка: ' + data.message);
+                    }
                 }
             })
             .catch(error => alert('Помилка при відправці: ' + error));
         }
+
+        // Завантаження картриджів "В дорозі"
+        function fetchInTransitCartridges() {
+            fetch('/api/in_transit_cartridges', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => updateInTransitTable(data.cartridges))
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function updateInTransitTable(cartridges) {
+            const tbody = document.getElementById('in-transit-table-body');
+            tbody.innerHTML = '';
+            cartridges.forEach(cartridge => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${cartridge.id}</td>
+                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
+                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
+                    <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
+                    <td>${cartridge.dept_name || 'Не вказано'}</td>
+                    <td>${cartridge.parcel_track || 'Не вказано'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Завантаження картриджів "На зберіганні"
+        function fetchInStorageCartridges() {
+            fetch('/api/in_storage_cartridges', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => updateInStorageTable(data.cartridges))
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function updateInStorageTable(cartridges) {
+            const tbody = document.getElementById('in-storage-table-body');
+            tbody.innerHTML = '';
+            const statusMap = {
+                1: 'На зберіганні (порожній)',
+                6: 'На зберіганні (заправлений)'
+            };
+            cartridges.forEach(cartridge => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${cartridge.id}</td>
+                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
+                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
+                    <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
+                    <td>${cartridge.dept_name || 'Не вказано'}</td>
+                    <td>${statusMap[cartridge.status] || 'Невідомий'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
 
         // Показ історії
         function showHistory(cartridgeId) {
