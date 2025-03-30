@@ -1,40 +1,3 @@
-# Треба доробити processCartridge таким чином
-# В модальне вікно "Додати подію для картриджа"
-# Видалити поле "Дата". Замість нього всюди де треба передавати поточну дату з врахуванням часового поясу
-# Замість поля "Дата" додати випадаючий список "Принтер", який залежить від
-# випадаючого списку "Відділ (необов’язково)"
-# випадаючий список "Відділ (необов’язково)" зробити обов'язковим для заповнення
-
-# при успішному додаванні події оновлювати запис у таблиці "Cartridges" для
-# вибраного картриджа і змінювати принтер, на той куди його поставили, тобто поле "in_printer"
-# це поле може бути порожнім
-
-# реалізовано:  додати поле curr_status: Mapped[int] до таблиці "Cartridges"
-# реалізовано:  і також його міняти при зміні події для картрижа
-# реалізовано:  для того щоб не перелопачувати постійно таблицю подій у пошуках останнього стану
-
-# реалізовано: кнопку Звіт у "Списку картриджів" і сортування по моделі!
-# реалізовано: додати таблицю моделей картриджів! писати вручну погано.
-
-# у деяких принтерах буває 2 картриджі: драм і тонер. треба реалізувати.
-
-
-#28.03.25
-#Додано друк адресних ярликів з кнопки на сторінці обробки картриджів та у модальному вікні додавання подій
-
-#24.03.25
-#Поміняно значення статусів
-#Було                   Стало
-#===================================================
-#Порожній - 			Не вказано
-#Очікує заправки - 		На зберіганні (порожній)
-#Заправлений - 			Відправлено в користування
-#В дорозі - 			Відправлено на заправку
-#Списаний - 			Непридатний (списаний)
-#Одноразовий - 			Одноразовий (фарба у банці)
-#На зберіганні - 		На зберіганні (заправлений)
-
-
 import os, secrets
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, Response, send_file
@@ -707,14 +670,13 @@ def delete_cartridge_model(model_id):
     return redirect(url_for('cartridge_models'))
 
 
-
 @app.route('/add_cartridge_event', methods=['POST'])
 @login_required
 def add_cartridge_event():
     serial_num = request.form.get('serial_num')
     status = request.form.get('status')
-    date_ofchange = request.form.get('date_ofchange')
-    exec_dept = request.form.get('exec_dept') or None
+    exec_dept = request.form.get('exec_dept')
+    printer = request.form.get('printer') or None
     parcel_track = request.form.get('parcel_track') or None
 
     # Перевірка наявності картриджа
@@ -722,35 +684,35 @@ def add_cartridge_event():
     if not cartridge:
         return jsonify({'success': False, 'message': 'Картридж із таким серійним номером не знайдено!'})
 
+    # Перевірка, чи вибрано відділ
+    if not exec_dept:
+        return jsonify({'success': False, 'message': 'Виберіть відділ!'})
+
     # Додавання події в CartridgeStatus
     new_status = CartridgeStatus(
         cartridge_id=cartridge.id,
         status=int(status),
-        date_ofchange=datetime.strptime(date_ofchange, '%Y-%m-%dT%H:%M'),
+        date_ofchange=datetime.now(),  # Поточна дата з урахуванням часового поясу сервера
         parcel_track=parcel_track,
-        exec_dept=exec_dept,
+        exec_dept=int(exec_dept),
         user_updated=current_user.id,
         time_updated=datetime.now()
     )
+    db.session.add(new_status)
 
-#    db.session.add(new_status)
-#    cartridge.curr_status = int(status)  # Синхронізуємо статус
-#    cartridge.user_updated = current_user.id  # Оновлюємо користувача
-#    cartridge.time_updated = datetime.now()  # Оновлюємо час
-#    # Комітимо всі зміни в базі
-#    db.session.commit()
+    # Оновлення Cartridges
+    cartridge.curr_status = int(status)
+    cartridge.in_printer = int(printer) if printer else None  # Оновлюємо принтер, якщо вибрано
+    cartridge.user_updated = current_user.id
+    cartridge.time_updated = datetime.now()
+
     try:
-        db.session.add(new_status)
-        cartridge.curr_status = int(status)
-        cartridge.user_updated = current_user.id
-        cartridge.time_updated = datetime.now()
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Помилка: {str(e)}'})
 
     return jsonify({'success': True})
-
 
 
 @app.route('/processCartridge')
@@ -865,6 +827,21 @@ def api_equipments():
     }
 
     return jsonify({'equipments': equipments, 'pagination': pagination_data})
+
+#Новий ендпоінт для принтерів
+@app.route('/api/printers_by_dept/<int:dept_id>', methods=['GET'])
+@login_required
+def printers_by_dept(dept_id):
+    printers = CustomerEquipment.query.filter_by(print_dept=dept_id).all()
+    printers_data = [
+        {
+            'id': printer.id,
+            'model_name': PrinterModel.query.get(printer.print_model).model_name
+        }
+        for printer in printers
+    ]
+    return jsonify({'printers': printers_data})
+
 
 @app.route('/api/in_transit_cartridges', methods=['GET'])
 @login_required

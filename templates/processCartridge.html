@@ -32,16 +32,18 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="date_ofchange" class="form-label">Дата</label>
-                            <input type="datetime-local" class="form-control" id="date_ofchange" name="date_ofchange">
-                        </div>
-                        <div class="mb-3">
-                            <label for="exec_dept" class="form-label">Відділ (необов’язково)</label>
-                            <select class="form-select" id="exec_dept" name="exec_dept">
-                                <option value="">Не вказано</option>
+                            <label for="exec_dept" class="form-label">Відділ</label>
+                            <select class="form-select" id="exec_dept" name="exec_dept" required>
+                                <option value="">Виберіть відділ</option>
                                 {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
                                     <option value="{{ dept.id }}">{{ dept.deptname }}</option>
                                 {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="printer" class="form-label">Принтер</label>
+                            <select class="form-select" id="printer" name="printer" disabled>
+                                <option value="">Спочатку виберіть відділ</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -58,6 +60,8 @@
             </div>
         </div>
     </div>
+
+
 
 <!-- Модальне вікно для історії дій -->
     <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
@@ -283,30 +287,26 @@
 {% block scripts %}
     <script>
         window.addEventListener('DOMContentLoaded', (event) => {
-            const now = new Date();
-            const formattedDate = now.toISOString().slice(0, 16);
-            document.getElementById('date_ofchange').value = formattedDate;
             fetchInTransitCartridges();
             fetchInStorageCartridges();
         });
 
-//***************************************************
-        // Додаємо обробник для введення в поле "Серійний номер"
         const serialInput = document.getElementById('serial_num');
         const suggestionsDropdown = document.getElementById('serial-suggestions');
+        const execDeptSelect = document.getElementById('exec_dept');
+        const printerSelect = document.getElementById('printer');
         let selectedIndex = -1;
 
+        // Обробка введення серійного номера
         serialInput.addEventListener('input', debounce((e) => {
             const query = e.target.value.trim();
-            if (query.length >= 2) { // Починаємо пошук після введення 2 символів
+            if (query.length >= 2) {
                 fetch(`/api/cartridges?search=${encodeURIComponent(query)}`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 })
                 .then(response => response.json())
-                .then(data => {
-                    updateSuggestions(data.cartridges);
-                })
+                .then(data => updateSuggestions(data.cartridges))
                 .catch(error => console.error('Помилка:', error));
             } else {
                 suggestionsDropdown.innerHTML = '';
@@ -348,7 +348,7 @@
                         serialInput.value = cartridge.serial_num;
                         suggestionsDropdown.innerHTML = '';
                         suggestionsDropdown.classList.remove('show');
-                        triggerBlurEvent(); // Викликаємо blur для завантаження статусу
+                        triggerBlurEvent();
                     });
                     suggestionsDropdown.appendChild(item);
                 });
@@ -377,7 +377,7 @@
             };
         }
 
-        // Існуючий обробник blur (залишаємо без змін, додаємо після нього triggerBlurEvent)
+        // Обробка blur для serial_num
         serialInput.addEventListener('blur', (e) => {
             const serialNum = e.target.value.trim();
             if (serialNum) {
@@ -392,7 +392,6 @@
                     if (isModalOpen) {
                         if (data.success && data.latest_status) {
                             document.getElementById('status').value = data.latest_status.status || '0';
-                            document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
                             document.getElementById('exec_dept').value = data.latest_status.exec_dept || '';
                             document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
                         } else {
@@ -422,16 +421,47 @@
             serialInput.dispatchEvent(event);
         }
 
-        // Очищення dropdown при закритті модального вікна
+        // Динамічне завантаження принтерів при зміні відділу
+        execDeptSelect.addEventListener('change', () => {
+            const deptId = execDeptSelect.value;
+            if (deptId) {
+                fetch(`/api/printers_by_dept/${deptId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    printerSelect.innerHTML = '<option value="">Виберіть принтер (необов’язково)</option>';
+                    data.printers.forEach(printer => {
+                        const option = document.createElement('option');
+                        option.value = printer.id;
+                        option.textContent = printer.model_name;
+                        printerSelect.appendChild(option);
+                    });
+                    printerSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Помилка завантаження принтерів:', error);
+                    printerSelect.innerHTML = '<option value="">Помилка завантаження</option>';
+                    printerSelect.disabled = true;
+                });
+            } else {
+                printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
+                printerSelect.disabled = true;
+            }
+        });
+
+        // Очищення форми при закритті модального вікна
         document.getElementById('processModal').addEventListener('hidden.bs.modal', () => {
             processModal._isShown = false;
             suggestionsDropdown.innerHTML = '';
             suggestionsDropdown.classList.remove('show');
+            document.getElementById('processForm').reset();
+            printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
+            printerSelect.disabled = true;
         });
 
-
-//***************************************************
-
+        // Завантаження картриджів "В дорозі"
         function fetchInTransitCartridges() {
             fetch('/api/in_transit_cartridges', {
                 method: 'GET',
@@ -459,6 +489,7 @@
             });
         }
 
+        // Завантаження картриджів "На зберіганні"
         function fetchInStorageCartridges() {
             fetch('/api/in_storage_cartridges', {
                 method: 'GET',
@@ -490,8 +521,10 @@
             });
         }
 
+        // Ініціалізація модальних вікон
         const processModal = new bootstrap.Modal(document.getElementById('processModal'));
         const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+        const printLabelModal = new bootstrap.Modal(document.getElementById('printLabelModal'));
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F2') {
@@ -516,61 +549,18 @@
             }
         });
 
-        // Додаємо обробник для кнопки "Друкувати ярлик"
+        // Обробка кнопки "Друкувати ярлик"
         document.getElementById('printLabelBtn').addEventListener('click', () => {
             const deptId = document.getElementById('exec_dept').value;
             if (deptId) {
-                // Формуємо URL із обраним dept_id і відкриваємо в новій вкладці
                 const url = `/generate_shipping_label/${deptId}`;
                 window.open(url, '_blank');
             } else {
-                alert('Будь ласка, виберіть відділ у списку "Відділ (необов’язково)"');
+                alert('Будь ласка, виберіть відділ!');
             }
         });
 
-
-        document.getElementById('serial_num').addEventListener('blur', (e) => {
-            const serialNum = e.target.value.trim();
-            if (serialNum) {
-                let isModalOpen = processModal._isShown;
-                fetch('/check_cartridge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ serial_num: serialNum })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (isModalOpen) {
-                        if (data.success && data.latest_status) {
-                            document.getElementById('status').value = data.latest_status.status || '0';
-                            document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
-                            document.getElementById('exec_dept').value = data.latest_status.exec_dept || '';
-                            document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
-                        } else {
-                            const label = document.querySelector('label[for="serial_num"]');
-                            label.classList.add('double-blink');
-                            setTimeout(() => label.classList.remove('double-blink'), 1200);
-                            document.getElementById('serial_num').focus();
-                            document.getElementById('serial_num').select();
-                        }
-                    }
-                })
-                .catch(error => {
-                    if (isModalOpen) {
-                        const label = document.querySelector('label[for="serial_num"]');
-                        label.classList.add('double-blink');
-                        setTimeout(() => label.classList.remove('double-blink'), 1200);
-                        document.getElementById('serial_num').focus();
-                        document.getElementById('serial_num').select();
-                    }
-                });
-            }
-        });
-
-        document.getElementById('processModal').addEventListener('hidden.bs.modal', () => {
-            processModal._isShown = false;
-        });
-
+        // Відправка форми
         function submitForm() {
             const formData = new FormData(document.getElementById('processForm'));
             fetch('/add_cartridge_event', {
@@ -583,9 +573,11 @@
                     alert('Подію додано!');
                     processModal.hide();
                     document.getElementById('processForm').reset();
-                    document.getElementById('date_ofchange').value = new Date().toISOString().slice(0, 16);
                     fetchInTransitCartridges();
                     fetchInStorageCartridges();
+                    if (window.location.pathname === '/cartridges') {
+                        fetchCartridges(document.getElementById('search').value.trim(), 1);
+                    }
                 } else {
                     alert('Помилка: ' + data.message);
                 }
@@ -593,6 +585,7 @@
             .catch(error => alert('Помилка при відправці: ' + error));
         }
 
+        // Показ історії
         function showHistory(cartridgeId) {
             fetch(`/api/cartridge_history/${cartridgeId}`, {
                 method: 'GET',
@@ -601,7 +594,6 @@
             .then(response => response.json())
             .then(data => {
                 updateHistoryTable(data.history);
-                // Оновлюємо URL кнопки "Звіт" із поточним cartridgeId
                 const exportBtn = document.getElementById('exportHistoryBtn');
                 exportBtn.href = `/export/cartridge_history/${cartridgeId}`;
                 historyModal.show();
@@ -609,6 +601,7 @@
             .catch(error => console.error('Помилка:', error));
         }
 
+        // Оновлення таблиці історії
         function updateHistoryTable(history) {
             const tbody = document.getElementById('history-table-body');
             tbody.innerHTML = '';
@@ -634,20 +627,16 @@
             });
         }
 
-        // Ініціалізація нового модального вікна для друку ярликів
-        const printLabelModal = new bootstrap.Modal(document.getElementById('printLabelModal'));
-
-        // Обробник для кнопки "Друкувати" у новому модальному вікні
+        // Обробка друку ярлика в модальному вікні
         document.getElementById('printLabelConfirmBtn').addEventListener('click', () => {
             const deptId = document.getElementById('receiver_dept').value;
             if (deptId) {
                 const url = `/generate_shipping_label/${deptId}`;
                 window.open(url, '_blank');
-                printLabelModal.hide(); // Закриваємо модальне вікно після друку
+                printLabelModal.hide();
             } else {
                 alert('Будь ласка, виберіть відділ одержувач');
             }
         });
-
     </script>
 {% endblock %}
