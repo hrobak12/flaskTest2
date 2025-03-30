@@ -52,6 +52,7 @@
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
         </div>
     </div>
+
     <table class="table table-striped" id="cartridge-table">
         <thead>
             <tr>
@@ -64,41 +65,7 @@
             </tr>
         </thead>
         <tbody id="cartridge-table-body">
-            {% for cartridge in cartridges %}
-            <tr>
-                <td>{{ cartridge.id }}</td>
-                <td>{{ cartridge.serial_num }}</td>
-                <td class="cartridge-model" title="{{ cartridge.cartridge_model or 'Не вказано' }}">
-                    {{ cartridge.cartridge_model or 'Не вказано' }}
-                </td>
-                <td class="in-printer" title="{% if cartridge.in_printer %}{% set equipment = CustomerEquipment.query.get(cartridge.in_printer) %}{{ PrinterModel.query.get(equipment.print_model).model_name }} ({{ RefillDept.query.get(equipment.print_dept).deptname }}){% else %}Немає{% endif %}">
-                    {% if cartridge.in_printer %}
-                        {% set equipment = CustomerEquipment.query.get(cartridge.in_printer) %}
-                        {{ PrinterModel.query.get(equipment.print_model).model_name }} ({{ RefillDept.query.get(equipment.print_dept).deptname }})
-                    {% else %}
-                        Немає
-                    {% endif %}
-                </td>
-                <td>
-                    {% if cartridge.curr_status == 0 %}Не вказано{% endif %}
-                    {% if cartridge.curr_status == 1 %}На зберіганні (порожній){% endif %}
-                    {% if cartridge.curr_status == 2 %}Відправлено в користування{% endif %}
-                    {% if cartridge.curr_status == 3 %}Відправлено на заправку{% endif %}
-                    {% if cartridge.curr_status == 4 %}Непридатний (списаний){% endif %}
-                    {% if cartridge.curr_status == 5 %}Одноразовий (фарба у банці){% endif %}
-                    {% if cartridge.curr_status == 6 %}На зберіганні (заправлений){% endif %}
-                </td>
-                <td class="actions-column">
-                    <form action="{{ url_for('cartridge_actions', cartridge_id=cartridge.id) }}" method="POST" class="d-inline">
-                        <button type="submit" class="btn btn-warning btn-sm">Історія дій</button>
-                    </form>
-                    <a href="{{ url_for('edit_cartridge', cartridge_id=cartridge.id) }}" class="btn btn-info btn-sm">Редагувати</a>
-                    <form action="{{ url_for('delete_cartridge', cartridge_id=cartridge.id) }}" method="POST" class="d-inline">
-                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені?')">Видалити</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
+            <!-- Дані завантажуються через JS -->
         </tbody>
     </table>
 
@@ -173,6 +140,10 @@
         });
 
         function fetchCartridges(search, page) {
+            const tbody = document.getElementById('cartridge-table-body');
+            // Показуємо "Завантажується..." перед початком запиту
+            // tbody.innerHTML = '<tr><td colspan="6" class="text-center">Завантажується...</td></tr>';
+
             fetch(`/api/cartridges?search=${encodeURIComponent(search)}&page=${page}`, {
                 method: 'GET',
                 headers: {
@@ -211,9 +182,7 @@
                           cartridge.curr_status === 6 ? 'На зберіганні (заправлений)' : 'Невідомий статус'}
                     </td>
                     <td class="actions-column">
-                        <form action="/cartridge_actions/${cartridge.id}" method="POST" class="d-inline">
-                            <button type="submit" class="btn btn-warning btn-sm">Історія дій</button>
-                        </form>
+                        <a href="#" class="btn btn-warning btn-sm" onclick="generateBarcode(${cartridge.id}); return false;">Наклейка</a>
                         <a href="/edit_cartridge/${cartridge.id}" class="btn btn-info btn-sm">Редагувати</a>
                         <form action="/delete_cartridge/${cartridge.id}" method="POST" class="d-inline">
                             <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені?')">Видалити</button>
@@ -294,6 +263,9 @@
             });
         }
 
+        function generateBarcode(cartridgeId) {
+            alert('Ця функція не реалізована');
+        }
 
     </script>
 {% endblock %}

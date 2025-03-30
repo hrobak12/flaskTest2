@@ -411,20 +411,6 @@ def delete_cartridge(cartridge_id):
     flash('Картридж видалено!')
     return redirect(url_for('cartridges'))
 
-
-@app.route('/cartridge_actions/<int:cartridge_id>', methods=['GET', 'POST'])
-@login_required
-def cartridge_actions(cartridge_id):
-    cartridge = Cartridges.query.get_or_404(cartridge_id)
-    statuses = CartridgeStatus.query.filter_by(cartridge_id=cartridge_id).order_by(CartridgeStatus.date_ofchange.desc()).all()
-    return render_template('cartridge_actions.html',
-                          cartridge=cartridge,
-                          statuses=statuses,
-                          Cartridges=Cartridges,
-                          PrinterModel=PrinterModel,
-                          RefillDept=RefillDept,
-                          User=User)
-
 @app.route('/send_to_refill/<int:cartridge_id>', methods=['POST'])
 @login_required
 def send_to_refill(cartridge_id):
