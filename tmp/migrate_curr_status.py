@@ -19,22 +19,22 @@ for cartridge in cartridges:
 
     # Шукаємо останню подію для цього картриджа в CartridgeStatus
     cursor.execute("""
-        SELECT status 
+        SELECT exec_dept 
         FROM cartrg_status 
         WHERE cartridge_id = ? 
         ORDER BY time_updated DESC 
         LIMIT 1
     """, (cartridge_id,))
-    last_status = cursor.fetchone()
+    last_exec_dept = cursor.fetchone()
 
-    if last_status:
+    if last_exec_dept:
         # Якщо є подія, оновлюємо curr_status у Cartridges
-        status_value = last_status[0]
+        last_exec_dept_value = last_exec_dept[0]
         cursor.execute("""
             UPDATE cartridges 
-            SET curr_status = ? 
+            SET curr_dept = ? 
             WHERE id = ?
-        """, (status_value, cartridge_id))
+        """, (last_exec_dept_value, cartridge_id))
         updated_count += 1
     else:
         # Якщо подій немає, лишаємо curr_status як 0 (за замовчуванням)

@@ -331,6 +331,7 @@ def cartridges():
                            pagination=pagination)
 
 @app.route('/add_cartridge', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def add_cartridge():
     if request.method == 'POST':
@@ -466,6 +467,7 @@ def cartridge_status():
 
 @app.route('/update_status/<int:status_id>', methods=['POST'])
 @login_required
+@admin_required
 def update_status(status_id):
     status = CartridgeStatus.query.get_or_404(status_id)
     new_status = int(request.form['status'])
@@ -484,6 +486,7 @@ def update_status(status_id):
 
 @app.route('/delete_status/<int:status_id>', methods=['POST'])
 @login_required
+@admin_required
 def delete_status(status_id):
     status = CartridgeStatus.query.get_or_404(status_id)
     db.session.delete(status)
@@ -694,6 +697,7 @@ def add_cartridge_event():
     # Оновлення Cartridges
     cartridge.curr_status = int(status)
     cartridge.in_printer = int(printer) if printer else None  # Оновлюємо принтер, якщо вибрано
+    cartridge.curr_dept = int(exec_dept)
     cartridge.user_updated = current_user.id
     cartridge.time_updated = datetime.now()
 
@@ -870,30 +874,24 @@ def api_in_transit_cartridges():
 
 
 # Новий ендпоінт для "На зберіганні"
+
 @app.route('/api/in_storage_cartridges', methods=['GET'])
 @login_required
 def api_in_storage_cartridges():
-    current_date = datetime.utcnow()
-    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
-                                       .filter(CartridgeStatus.date_ofchange <= current_date)\
-                                       .group_by(CartridgeStatus.cartridge_id)\
-                                       .subquery()
-    in_storage_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname)\
-                                 .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id)\
-                                 .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
-                                 .join(latest_status_subquery,
-                                       and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
-                                            CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
-                                 .filter(CartridgeStatus.status.in_([1, 6]))\
-                                 .order_by(Cartridges.cartridge_model.asc())  # Змінено на 1 і 6 # Сортування за моделлю
+    # Запит до Cartridges із фільтром по curr_status (1 або 6) і приєднанням RefillDept
+    in_storage_query = db.session.query(Cartridges, RefillDept.deptname)\
+                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
+                                 .filter(Cartridges.curr_status.in_([1, 6]))\
+                                 .order_by(Cartridges.cartridge_model.asc())
+
     cartridges_data = []
-    for cartridge, status, dept_name in in_storage_query.all():
+    for cartridge, dept_name in in_storage_query.all():
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
             'cartridge_model': cartridge.cartridge_model,
-            'status': status.status,  # Додаємо статус замість parcel_track
-            'date_ofchange': status.date_ofchange.isoformat(),
+            'status': cartridge.curr_status,  # Беремо curr_status із Cartridges
+            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,  # Використовуємо time_updated
             'dept_name': dept_name or 'Не вказано'
         })
     return jsonify({'cartridges': cartridges_data})
@@ -1021,40 +1019,32 @@ def export_in_transit():
 @app.route('/export/in_storage', methods=['GET'])
 @login_required
 def export_in_storage():
-    # Отримуємо дані з API для "Картриджі на зберіганні"
-    current_date = datetime.utcnow()
-    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
-                                       .filter(CartridgeStatus.date_ofchange <= current_date)\
-                                       .group_by(CartridgeStatus.cartridge_id)\
-                                       .subquery()
-    in_storage_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname) \
-                                       .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id) \
-                                       .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id) \
-                                       .join(latest_status_subquery,
-                                             and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
-                                                  CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date)) \
-                                       .filter(CartridgeStatus.status.in_([1, 6]))  # Вибираємо статуси 1 і 6
+    # Запит до Cartridges із фільтром по curr_status (1 або 6) і приєднанням RefillDept
+    in_storage_query = db.session.query(Cartridges, RefillDept.deptname)\
+                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
+                                 .filter(Cartridges.curr_status.in_([1, 6]))\
+                                 .order_by(Cartridges.cartridge_model.asc())
 
     cartridges_data = []
-    for cartridge, status, dept_name in in_storage_query.all():
+    for cartridge, dept_name in in_storage_query.all():
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
             'cartridge_model': cartridge.cartridge_model or 'Не вказано',
-            'date_ofchange': status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
+            'date_ofchange': cartridge.time_updated.strftime('%Y-%m-%d %H:%M:%S') if cartridge.time_updated else 'Не вказано',
             'dept_name': dept_name or 'Не вказано',
-            'parcel_track': status.parcel_track or 'Не вказано'
+            'status': 'На зберіганні (порожній)' if cartridge.curr_status == 1 else 'На зберіганні (заправлений)'  # Додаємо статус замість parcel_track
         })
 
     # Створюємо Excel-файл
     wb = Workbook()
     ws = wb.active
     ws.title = "Картриджі на зберіганні"
-    headers = ["ID", "Серійний номер", "Модель картриджа", "Дата зміни", "Відділ", "Трек-номер"]
+    headers = ["ID", "Серійний номер", "Модель картриджа", "Дата зміни", "Відділ", "Статус"]
     ws.append(headers)
     for cartridge in cartridges_data:
         ws.append([cartridge['id'], cartridge['serial_num'], cartridge['cartridge_model'],
-                   cartridge['date_ofchange'], cartridge['dept_name'], cartridge['parcel_track']])
+                   cartridge['date_ofchange'], cartridge['dept_name'], cartridge['status']])
 
     # Налаштування ширини колонок
     column_widths = {}
@@ -1078,6 +1068,7 @@ def export_in_storage():
     filename = f"Картриджі_на_зберіганні_{timestamp}.xlsx"
 
     return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 
 @app.route('/export/cartridge_history/<int:cartridge_id>', methods=['GET'])
 @login_required
@@ -1361,6 +1352,137 @@ def generate_shipping_label(dept_id):
     buffer.seek(0)
     return Response(buffer.getvalue(), mimetype='application/pdf',
                     headers={"Content-Disposition": "attachment;filename=shipping_label_"+str(dept_id)+".pdf"})
+
+#****************** експериментально. звіт "що зроблено за день"
+# Маршрут для відображення сторінки
+@app.route('/report_period', methods=['GET'])
+@login_required
+def report_period():
+    return render_template('report_period.html')
+
+# API для отримання даних звіту
+@app.route('/api/report_period', methods=['GET'])
+@login_required
+def api_report_period():
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    # Перетворюємо рядки дат у об'єкти datetime
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Неправильний формат дати. Використовуйте YYYY-MM-DD'}), 400
+
+    # Базовий запит до CartridgeStatus
+    query = db.session.query(CartridgeStatus, Cartridges, RefillDept.deptname, User.username)\
+                      .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)\
+                      .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                      .join(User, CartridgeStatus.user_updated == User.id)\
+                      .filter(CartridgeStatus.date_ofchange.between(start_date, end_date))
+
+    # Фільтр для не-адмінів
+    if current_user.role != 'admin':  # Перевіряємо роль замість is_admin
+        query = query.filter(CartridgeStatus.user_updated == current_user.id)
+
+    # Виконуємо запит і формуємо дані
+    report_data = []
+    status_map = {
+        0: 'Не вказано',
+        1: 'На зберіганні (порожній)',
+        2: 'Відправлено в користування',
+        3: 'Відправлено на заправку',
+        4: 'Непридатний (списаний)',
+        5: 'Одноразовий (фарба у банці)',
+        6: 'На зберіганні (заправлений)'
+    }
+    for status, cartridge, dept_name, username in query.order_by(CartridgeStatus.date_ofchange.asc()).all():
+        report_data.append({
+            'id': cartridge.id,
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+            'status': status_map[status.status],
+            'date_ofchange': status.date_ofchange.isoformat(),
+            'dept_name': dept_name or 'Не вказано',
+            'user_login': username or 'Не вказано'  # Змінено з login на username
+        })
+
+    return jsonify({'report': report_data})
+
+@app.route('/export/report_period', methods=['GET'])
+@login_required
+def export_report_period():
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except (ValueError, TypeError):
+        return "Неправильний формат дати", 400
+
+    query = db.session.query(CartridgeStatus, Cartridges, RefillDept.deptname, User.username)\
+                      .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)\
+                      .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                      .join(User, CartridgeStatus.user_updated == User.id)\
+                      .filter(CartridgeStatus.date_ofchange.between(start_date, end_date))
+
+    if current_user.role != 'admin':  # Перевіряємо роль замість is_admin
+        query = query.filter(CartridgeStatus.user_updated == current_user.id)
+
+    report_data = []
+    status_map = {
+        0: 'Не вказано',
+        1: 'На зберіганні (порожній)',
+        2: 'Відправлено в користування',
+        3: 'Відправлено на заправку',
+        4: 'Непридатний (списаний)',
+        5: 'Одноразовий (фарба у банці)',
+        6: 'На зберіганні (заправлений)'
+    }
+    for status, cartridge, dept_name, username in query.order_by(CartridgeStatus.date_ofchange.asc()).all():
+        report_data.append([
+            cartridge.id,
+            cartridge.serial_num,
+            cartridge.cartridge_model or 'Не вказано',
+            status_map[status.status],
+            status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
+            dept_name or 'Не вказано',
+            username or 'Не вказано'  # Змінено з login на username
+        ])
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Звіт період"
+    headers = ["ID", "Серійний номер", "Модель картриджа", "Статус", "Дата зміни", "Відділ", "Користувач"]
+    ws.append(headers)
+    for row in report_data:
+        ws.append(row)
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Звіт_період_{timestamp}.xlsx"
+
+    return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+#****************** експериментально. звіт "що зроблено за день"
+
 
 
 if __name__ == '__main__':

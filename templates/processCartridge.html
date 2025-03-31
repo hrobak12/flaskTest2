@@ -489,7 +489,7 @@
                 `;
                 tbody.appendChild(row);
             });
-        }
+                }
 
         // Завантаження картриджів "На зберіганні"
         function fetchInStorageCartridges() {
@@ -515,7 +515,7 @@
                     <td>${cartridge.id}</td>
                     <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
                     <td>${cartridge.cartridge_model || 'Не вказано'}</td>
-                    <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
+                    <td>${cartridge.date_ofchange ? new Date(cartridge.date_ofchange).toLocaleString() : 'Не вказано'}</td>
                     <td>${cartridge.dept_name || 'Не вказано'}</td>
                     <td>${statusMap[cartridge.status] || 'Невідомий'}</td>
                 `;

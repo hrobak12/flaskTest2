@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Звіт період{% endblock %}
+{% block content %}
+    <h1>Звіт період</h1>
+
+    <!-- Форма для вибору дат -->
+    <div class="mb-3">
+        <form id="report-form" class="d-flex align-items-center gap-3">
+            <div class="form-group">
+                <label for="start_date">Початкова дата:</label>
+                <input type="date" id="start_date" name="start_date" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="end_date">Кінцева дата:</label>
+                <input type="date" id="end_date" name="end_date" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Показати звіт</button>
+            <a href="#" id="export-report" class="btn btn-excel d-none">Експорт у Excel</a>
+        </form>
+    </div>
+
+    <!-- Таблиця для результатів -->
+    <div class="table-wrapper position-relative">
+        <table class="table table-striped" id="report-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Серійний номер</th>
+                    <th>Модель картриджа</th>
+                    <th>Статус</th>
+                    <th>Дата зміни</th>
+                    <th>Відділ</th>
+                    <th>Користувач</th>
+                </tr>
+            </thead>
+            <tbody id="report-table-body">
+                <tr>
+                    <td colspan="7" class="text-center">Виберіть період для звіту</td>
+                </tr>
+            </tbody>
+        </table>
+        <div id="table-loading-overlay" class="loading-overlay d-none">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Завантажується...</span>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .table-wrapper {
+            position: relative;
+        }
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        .d-none {
+            display: none;
+        }
+        .btn-excel {
+            background-color: #1D6F42;
+            color: white;
+            border: none;
+        }
+        .btn-excel:hover {
+            background-color: #155932;
+            color: white;
+        }
+        .gap-3 {
+            gap: 1rem;
+        }
+    </style>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        const reportForm = document.getElementById('report-form');
+        const reportTableBody = document.getElementById('report-table-body');
+        const loadingOverlay = document.getElementById('table-loading-overlay');
+        const exportBtn = document.getElementById('export-report');
+
+        // Обробка відправки форми
+        reportForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+
+            if (startDate && endDate) {
+                fetchReport(startDate, endDate);
+            } else {
+                alert('Будь ласка, виберіть обидві дати!');
+            }
+        });
+
+        function fetchReport(startDate, endDate) {
+            loadingOverlay.classList.remove('d-none');
+            exportBtn.classList.add('d-none');
+
+            fetch(`/api/report_period?start_date=${startDate}&end_date=${endDate}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    reportTableBody.innerHTML = '<tr><td colspan="7" class="text-center">Помилка у датах</td></tr>';
+                } else {
+                    updateReportTable(data.report);
+                    exportBtn.href = `/export/report_period?start_date=${startDate}&end_date=${endDate}`;
+                    exportBtn.classList.remove('d-none');
+                }
+                loadingOverlay.classList.add('d-none');
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                reportTableBody.innerHTML = '<tr><td colspan="7" class="text-center">Помилка завантаження</td></tr>';
+                loadingOverlay.classList.add('d-none');
+            });
+        }
+
+        function updateReportTable(report) {
+            reportTableBody.innerHTML = '';
+            if (report.length === 0) {
+                reportTableBody.innerHTML = '<tr><td colspan="7" class="text-center">Немає даних за цей період</td></tr>';
+            } else {
+                report.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.id}</td>
+                        <td>${item.serial_num}</td>
+                        <td>${item.cartridge_model}</td>
+                        <td>${item.status}</td>
+                        <td>${new Date(item.date_ofchange).toLocaleString()}</td>
+                        <td>${item.dept_name}</td>
+                        <td>${item.user_login}</td>
+                    `;
+                    reportTableBody.appendChild(row);
+                });
+            }
+        }
+    </script>
+{% endblock %}
