@@ -29,15 +29,13 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('report_period') }}">Звіт за період</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('cartridges') }}">Картриджі</a>
-                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownRefs" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 Довідники
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="navbarDropdownRefs">
-                                <li><a class="dropdown-item" href="{{ url_for('equipments') }}">Обладнання</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('cartridges') }}">Картриджі</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('equipments') }}">Принтери</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('printer_models') }}">Моделі принтерів</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('cartridge_models') }}">Моделі картриджів</a></li> <!-- Додано пункт -->
                                 <li><a class="dropdown-item" href="{{ url_for('refill_depts') }}">Відділи</a></li>
