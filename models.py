@@ -64,7 +64,7 @@ class Cartridges(db.Model):
 # Нове поле. Потрібне щоб зразу знати статус картриджа, а не перебирати таблицю історії
     curr_status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     curr_dept: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-#    curr_parcel_track: Mapped[str] = mapped_column(String(13), nullable=True)
+    curr_parcel_track: Mapped[str] = mapped_column(String(13), nullable=True)
 
 class CartridgeStatus(db.Model):
     __tablename__ = "cartrg_status"

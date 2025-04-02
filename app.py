@@ -412,33 +412,32 @@ def delete_cartridge(cartridge_id):
     flash('Картридж видалено!')
     return redirect(url_for('cartridges'))
 
-@app.route('/send_to_refill/<int:cartridge_id>', methods=['POST'])
-@login_required
-def send_to_refill(cartridge_id):
-    cartridge = Cartridges.query.get_or_404(cartridge_id)
-    exec_dept_id = request.form['exec_dept_id']
-    parcel_track = request.form.get('parcel_track', '')
-    status = CartridgeStatus(
-        status=1,  # "refill is pending"
-        exec_dept=exec_dept_id,
-        parcel_track=parcel_track,
-        user_updated=current_user.id
-    )
-    cartridge.in_printer = None
-    event = EventLog(
-        table_name='cartridges',
-        event_type=1,  # Зміна статусу
-        user_updated=current_user.id
-    )
-    db.session.add(status)
-    db.session.add(event)
-    db.session.commit()
-    flash('Картридж відправлено на заправку!')
-    return redirect(url_for('cartridges'))
+#deprecated. застаріле.
+#@app.route('/send_to_refill/<int:cartridge_id>', methods=['POST'])
+#@login_required
+#def send_to_refill(cartridge_id):
+#    cartridge = Cartridges.query.get_or_404(cartridge_id)
+#    exec_dept_id = request.form['exec_dept_id']
+#    parcel_track = request.form.get('parcel_track', '')
+#    status = CartridgeStatus(
+#        status=1,  # "refill is pending"
+#        exec_dept=exec_dept_id,
+#        parcel_track=parcel_track,
+#        user_updated=current_user.id
+#    )
+#    cartridge.in_printer = None
+#    event = EventLog(
+#        table_name='cartridges',
+#        event_type=1,  # Зміна статусу
+#        user_updated=current_user.id
+#    )
+#    db.session.add(status)
+#    db.session.add(event)
+#    db.session.commit()
+#    flash('Картридж відправлено на заправку!')
+#    return redirect(url_for('cartridges'))
 
 # Відображення подій обробки картриджів та керування ними
-# Основний маршрут для відображення подій
-# Основний маршрут для відображення подій
 # Основний маршрут для відображення подій
 @app.route('/cartridge_status')
 @login_required
@@ -659,6 +658,12 @@ def delete_cartridge_model(model_id):
     return redirect(url_for('cartridge_models'))
 
 
+#**************************робота з картриджами**************************
+@app.route('/processCartridge')
+@login_required
+def processCartridge():
+    return render_template('processCartridge.html', user=current_user, RefillDept=RefillDept)
+
 @app.route('/add_cartridge_event', methods=['POST'])
 @login_required
 def add_cartridge_event():
@@ -694,12 +699,14 @@ def add_cartridge_event():
     )
     db.session.add(new_status)
 
-    # Оновлення Cartridges
+    # Оновлення запису катриджа в Cartridges
     cartridge.curr_status = int(status)
-    cartridge.in_printer = int(printer) if printer else None  # Оновлюємо принтер, якщо вибрано
     cartridge.curr_dept = int(exec_dept)
+    cartridge.curr_parcel_track = parcel_track
+    cartridge.in_printer = int(printer) if printer else None  # Оновлюємо принтер, якщо вибрано
     cartridge.user_updated = current_user.id
     cartridge.time_updated = datetime.now()
+
 
     try:
         db.session.commit()
@@ -709,11 +716,6 @@ def add_cartridge_event():
 
     return jsonify({'success': True})
 
-
-@app.route('/processCartridge')
-@login_required
-def processCartridge():
-    return render_template('processCartridge.html', user=current_user, RefillDept=RefillDept)
 
 @app.route('/check_cartridge', methods=['POST'])
 @login_required
@@ -785,6 +787,8 @@ def api_cartridges():
         'cartridges': cartridges_data,
         'pagination': pagination_data
     })
+
+#**************************робота з картриджами**************************
 
 # API для асинхронного пошуку по інвентарному номеру
 @app.route('/api/equipments', methods=['GET'])
@@ -864,33 +868,21 @@ def api_cartridges_by_status(cartridge_status):
 @app.route('/api/in_transit_cartridges', methods=['GET'])
 @login_required
 def api_in_transit_cartridges():
-    # Отримуємо поточну дату
-    current_date = datetime.utcnow()
-
-    # Підзапит для визначення останньої події для кожного картриджа
-    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
-                                       .filter(CartridgeStatus.date_ofchange <= current_date)\
-                                       .group_by(CartridgeStatus.cartridge_id)\
-                                       .subquery()
-
-    # Отримуємо картриджі зі статусом "В дорозі" (status = 3)
-    in_transit_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname)\
-                                 .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id)\
-                                 .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
-                                 .join(latest_status_subquery,
-                                       and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
-                                            CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
-                                 .filter(CartridgeStatus.status == 3)
+    # Запит до Cartridges із фільтром по curr_status == 3 і приєднанням RefillDept
+    in_transit_query = db.session.query(Cartridges, RefillDept.deptname)\
+                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
+                                 .filter(Cartridges.curr_status == 3)\
+                                 .order_by(Cartridges.time_updated.desc())
 
     cartridges_data = []
-    for cartridge, status, dept_name in in_transit_query.all():
+    for cartridge, dept_name in in_transit_query.all():
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
             'cartridge_model': cartridge.cartridge_model,
-            'date_ofchange': status.date_ofchange.isoformat(),
-            'dept_name': dept_name,
-            'parcel_track': status.parcel_track
+            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,
+            'dept_name': dept_name or 'Не вказано',
+            'parcel_track': cartridge.curr_parcel_track or 'Не вказано'
         })
 
     return jsonify({'cartridges': cartridges_data})
