@@ -1497,6 +1497,91 @@ def export_report_period():
     return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 #****************** експериментально. звіт "що зроблено за день"
+#****************** експериментально. масовий ввід ******************
+@app.route('/mass_input')
+@login_required
+def mass_input():
+    return render_template('mass_input.html', RefillDept=RefillDept)
+
+@app.route('/mass_add_cartridge_events', methods=['POST'])
+@login_required
+def mass_add_cartridge_events():
+    data = request.get_json()
+    exec_dept = data.get('exec_dept')
+    status = data.get('status')
+    serial_nums = data.get('serial_nums', [])
+
+    if not exec_dept or not serial_nums:
+        return jsonify({'success': False, 'message': 'Необхідно вказати відділ і хоча б один картридж!'}), 400
+
+    # Перевірка відділу
+    dept = RefillDept.query.filter_by(id=exec_dept, is_exec=1).first()
+    if not dept:
+        return jsonify({'success': False, 'message': 'Недійсний відділ заправки!'}), 400
+
+    # Обробка картриджів
+    report_data = []
+    for serial_num in serial_nums:
+        cartridge = Cartridges.query.filter_by(serial_num=serial_num).first()
+        if cartridge:
+            # Оновлення стану в Cartridges
+            cartridge.curr_status = int(status)
+            cartridge.curr_dept = int(exec_dept)
+            cartridge.user_updated = current_user.id
+            cartridge.time_updated = datetime.now()
+
+            # Додавання події в CartridgeStatus
+            new_status = CartridgeStatus(
+                cartridge_id=cartridge.id,
+                status=int(status),
+                date_ofchange=datetime.now(),
+                exec_dept=int(exec_dept),
+                user_updated=current_user.id,
+                time_updated=datetime.now()
+            )
+            db.session.add(new_status)
+            report_data.append({
+                'serial_num': cartridge.serial_num,
+                'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+                'date_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Помилка: {str(e)}'}), 500
+
+    # Генерація PDF-звіту
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+    p.setFont("TimesNewRoman", 12)
+    p.drawString(100, 800, "Звіт про масове відправлення картриджів")
+    p.drawString(100, 780, f"Відділ заправки: {dept.deptname}")
+    p.drawString(100, 760, f"Дата: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    y = 740
+    p.drawString(50, y, "Серійний номер")
+    p.drawString(200, y, "Модель картриджа")
+    p.drawString(350, y, "Дата/Час")
+    y -= 20
+
+    for item in report_data:
+        if y < 50:  # Перехід на нову сторінку
+            p.showPage()
+            p.setFont("TimesNewRoman", 12)
+            y = 800
+        p.drawString(50, y, item['serial_num'])
+        p.drawString(200, y, item['cartridge_model'])
+        p.drawString(350, y, item['date_time'])
+        y -= 20
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+
+    return Response(buffer.getvalue(), mimetype='application/pdf',
+                    headers={"Content-Disposition": "attachment;filename=mass_refill_report.pdf"})
 
 
 
