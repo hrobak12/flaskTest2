@@ -210,6 +210,7 @@
         }
 
         // Перевірка картриджа
+        // Перевірка картриджа
         function checkCartridge(serialNum) {
             fetch('/check_cartridge', {
                 method: 'POST',
@@ -219,7 +220,22 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    fetchCartridgeDetails(serialNum);
+                    // Перевірка статусу "Відправлено на заправку" (status = 3)
+                    fetch(`/api/cartridges?search=${encodeURIComponent(serialNum)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const cartridge = data.cartridges.find(c => c.serial_num === serialNum);
+                        if (cartridge && cartridge.curr_status === 3) {
+                            const label = document.querySelector('label[for="mass_serial_num"]');
+                            label.classList.add('double-blink');
+                            setTimeout(() => label.classList.remove('double-blink'), 1200);
+                            serialInput.value = '';
+                            serialInput.focus();
+                        } else {
+                            fetchCartridgeDetails(serialNum);
+                        }
+                    })
+                    .catch(error => console.error('Помилка:', error));
                 } else {
                     const label = document.querySelector('label[for="mass_serial_num"]');
                     label.classList.add('double-blink');
@@ -319,7 +335,7 @@
                     a.remove();
                     window.URL.revokeObjectURL(url);
                     massInputModal.hide();
-                    fetchInTransitCartridges(); // Оновлення таблиці "В дорозі"
+                    //fetchInTransitCartridges(); // Оновлення таблиці "В дорозі"
                 })
                 .catch(error => alert('Помилка: ' + error));
             }
