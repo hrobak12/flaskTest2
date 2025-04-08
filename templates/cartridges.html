@@ -264,7 +264,22 @@
         }
 
         function generateBarcode(cartridgeId) {
-            alert('Ця функція не реалізована');
+            fetch(`/api/barcode/${cartridgeId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/pdf' }
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `barcode_${cartridgeId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => console.error('Помилка:', error));
         }
 
     </script>

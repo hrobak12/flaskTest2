@@ -147,5 +147,14 @@
                 });
             }
         }
+
+        // Встановлення поточної дати для start_date та end_date
+        document.addEventListener('DOMContentLoaded', () => {
+            const startDateInput = document.getElementById('start_date');
+            const endDateInput = document.getElementById('end_date');
+            const today = new Date().toISOString().split('T')[0]; // Формат YYYY-MM-DD
+            startDateInput.value = today;
+            endDateInput.value = today;
+        });
     </script>
 {% endblock %}

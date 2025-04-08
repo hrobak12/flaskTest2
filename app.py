@@ -8,6 +8,14 @@ from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartri
 from datetime import datetime
 import bcrypt
 from openpyxl import Workbook
+from reportlab.lib.pagesizes import A4, mm #, A5, landscape, portrait
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+#from reportlab.graphics import renderPDF
+from barcode import Code128
+from barcode.writer import ImageWriter
+from transliterate import translit
 
 
 app = Flask(__name__)
@@ -970,6 +978,65 @@ def api_cartridge_status():
 
     return jsonify({'statuses': statuses, 'pagination': pagination_data})
 
+
+#**********************************************************
+#генерація наклейки на катридж
+
+@app.route('/api/barcode/<int:cartridge_id>', methods=['GET'])
+@login_required
+def generate_barcode(cartridge_id):
+    cartridge = Cartridges.query.get_or_404(cartridge_id)
+    serial_num = str(cartridge.serial_num)  # Перетворення в рядок
+
+    # Транслітерація кирилиці в латинські символи
+    barcode_serial = translit(serial_num, 'uk', reversed=True) if any(c.isalpha() and ord(c) > 127 for c in serial_num) else serial_num
+
+
+    # Налаштування розмірів
+    label_width = 80 * mm
+    label_height = 25 * mm
+    gap = 2 * mm
+
+    # Створення PDF у пам'яті
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=(label_width, label_height))
+
+    # Логотип Укрпошти (чорно-білий)
+    logo_path = os.path.join(app.static_folder, 'ukrposhta_logo.png')
+    if os.path.exists(logo_path):
+        c.drawImage(logo_path, 2 * mm, 2 * mm, width=20 * mm, height=20 * mm, preserveAspectRatio=True)
+
+    # Генерація штрих-коду Code 128
+    #barcode = Code128(serial_num, writer=ImageWriter())
+    barcode = Code128(barcode_serial, writer=ImageWriter())
+
+    barcode_path = os.path.join(app.static_folder, 'temp_barcode')
+    barcode.save(barcode_path, options={"write_text": False, "module_height": 15, "module_width": 0.4})
+    barcode_img_path = f"{barcode_path}.png"
+
+    # Розміщення штрих-коду
+    barcode_x = 25 * mm  # Відступ від логотипу
+    barcode_y = 6 * mm  # Вертикальний відступ
+    c.drawImage(barcode_img_path, barcode_x, barcode_y, width=50 * mm, height=15 * mm)
+
+    # Текст під штрих-кодом
+    c.setFont("Helvetica", 8)
+    text_x = barcode_x + (50 * mm - c.stringWidth(serial_num, "Helvetica", 8)) / 2  # Центрування
+    text_y = 2 * mm
+    c.drawString(text_x, text_y, serial_num)
+
+    # Завершення PDF
+    c.showPage()
+    c.save()
+
+    # Очищення тимчасового файлу штрих-коду
+    if os.path.exists(barcode_img_path):
+        os.remove(barcode_img_path)
+
+    buffer.seek(0)
+    return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=f"barcode_{serial_num}.pdf")
+
+
 @app.route('/export/in_transit', methods=['GET'])
 @login_required
 def export_in_transit():
@@ -1177,8 +1244,15 @@ def export_cartridge_events():
     ws.title = "Події обробки картриджів"
     headers = ["ID", "Картридж", "Статус", "Дата зміни", "Трек-номер", "Відділ"]
     ws.append(headers)
-    status_map = {0: 'Порожній', 1: 'Очікує заправки', 2: 'Заправлений', 3: 'В дорозі',
-                  4: 'Списаний', 5: 'Одноразовий', 6: 'На зберіганні'}
+    status_map = {
+        0: 'Не вказано',
+        1: 'На зберіганні (порожній)',
+        2: 'Відправлено в користування',
+        3: 'Відправлено на заправку',
+        4: 'Непридатний (списаний)',
+        5: 'Одноразовий (фарба у банці)',
+        6: 'На зберіганні (заправлений)'
+    }
     for status, serial_num, deptname in statuses:
         ws.append([status.id, serial_num, status_map.get(status.status, 'Невідомий'),
                    status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
@@ -1303,12 +1377,6 @@ def export_cartridges_table():
 
 #*******************************************************************
 #це тестовий pdf
-from reportlab.lib.pagesizes import A4, A5, landscape, portrait
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib import colors
-
 
 # Реєстрація шрифту Times New Roman
 pdfmetrics.registerFont(TTFont('TimesNewRoman', 'static/ttf/Times.ttf'))  # Шлях до файлу шрифту
