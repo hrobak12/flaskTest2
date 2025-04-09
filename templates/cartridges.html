@@ -47,11 +47,13 @@
             </button>
         </div>
         <div>
+            <a href="#" class="btn btn-warning me-2" onclick="printAllBarcodes(); return false;">Друк всіх наклейок</a>
             <a href="{{ url_for('export_cartridges_table') }}" class="btn btn-excel me-2">Звіт</a>
             <a href="{{ url_for('add_cartridge') }}" class="btn btn-success me-2">Додати картридж</a>
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
         </div>
     </div>
+
 
     <table class="table table-striped" id="cartridge-table">
         <thead>
@@ -274,6 +276,26 @@
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `barcode_${cartridgeId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function printAllBarcodes() {
+            const searchValue = document.getElementById('search').value.trim();
+            fetch(`/api/barcodes_all?search=${encodeURIComponent(searchValue)}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/pdf' }
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `all_barcodes_${new Date().toISOString().slice(0,10)}.pdf`;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();

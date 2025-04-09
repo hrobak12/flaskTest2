@@ -24,7 +24,7 @@
         <table class="table table-striped" id="report-table">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>№</th> <!-- Замість ID -->
                     <th>Серійний номер</th>
                     <th>Модель картриджа</th>
                     <th>Статус</th>
@@ -45,6 +45,7 @@
             </div>
         </div>
     </div>
+
 
     <style>
         .table-wrapper {
@@ -132,10 +133,10 @@
             if (report.length === 0) {
                 reportTableBody.innerHTML = '<tr><td colspan="7" class="text-center">Немає даних за цей період</td></tr>';
             } else {
-                report.forEach(item => {
+                report.forEach((item, index) => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${item.id}</td>
+                        <td>${index + 1}</td> <!-- Номер рядка -->
                         <td>${item.serial_num}</td>
                         <td>${item.cartridge_model}</td>
                         <td>${item.status}</td>

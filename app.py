@@ -2,7 +2,7 @@ import os, secrets
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, Response, send_file
 from sqlalchemy import func, and_
-from sqlalchemy.sql import text  # Додаємо імпорт text
+# from sqlalchemy.sql import text  # Додаємо імпорт text
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel
 from datetime import datetime
@@ -12,7 +12,7 @@ from reportlab.lib.pagesizes import A4, mm #, A5, landscape, portrait
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-#from reportlab.graphics import renderPDF
+# from reportlab.graphics import renderPDF
 from barcode import Code128
 from barcode.writer import ImageWriter
 from transliterate import translit
@@ -1443,6 +1443,7 @@ def generate_shipping_label(dept_id):
 def report_period():
     return render_template('report_period.html')
 
+
 # API для отримання даних звіту
 @app.route('/api/report_period', methods=['GET'])
 @login_required
@@ -1479,7 +1480,7 @@ def api_report_period():
         5: 'Одноразовий (фарба у банці)',
         6: 'На зберіганні (заправлений)'
     }
-    for status, cartridge, dept_name, username in query.order_by(CartridgeStatus.date_ofchange.asc()).all():
+    for status, cartridge, dept_name, username in query.order_by(CartridgeStatus.date_ofchange.desc()).all():
         report_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
@@ -1491,6 +1492,68 @@ def api_report_period():
         })
 
     return jsonify({'report': report_data})
+
+"""
+# Хоч і нова функція, але поки що відключаю
+# API для отримання даних звіту
+@app.route('/api/report_period', methods=['GET'])
+@login_required
+def api_report_period():
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    # Перетворюємо рядки дат у об'єкти datetime
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Неправильний формат дати. Використовуйте YYYY-MM-DD'}), 400
+
+    # Субзапит для отримання найсвіжішої події для кожного картриджа
+    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
+        .filter(CartridgeStatus.date_ofchange.between(start_date, end_date))\
+        .group_by(CartridgeStatus.cartridge_id).subquery()
+
+    # Основний запит із приєднанням до субзапиту
+    query = db.session.query(CartridgeStatus, Cartridges, RefillDept.deptname, User.username)\
+        .join(latest_status_subquery, (CartridgeStatus.cartridge_id == latest_status_subquery.c.cartridge_id) &
+              (CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
+        .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)\
+        .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+        .join(User, CartridgeStatus.user_updated == User.id)
+
+    # Фільтр для не-адмінів
+    if current_user.role != 'admin':
+        query = query.filter(CartridgeStatus.user_updated == current_user.id)
+
+    # Сортування за датою (найсвіжіші зверху)
+    query = query.order_by(CartridgeStatus.date_ofchange.desc())
+
+    # Формуємо дані
+    report_data = []
+    status_map = {
+        0: 'Не вказано',
+        1: 'На зберіганні (порожній)',
+        2: 'Відправлено в користування',
+        3: 'Відправлено на заправку',
+        4: 'Непридатний (списаний)',
+        5: 'Одноразовий (фарба у банці)',
+        6: 'На зберіганні (заправлений)'
+    }
+    for status, cartridge, dept_name, username in query.all():
+        report_data.append({
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+            'status': status_map[status.status],
+            'date_ofchange': status.date_ofchange.isoformat(),
+            'dept_name': dept_name or 'Не вказано',
+            'user_login': username or 'Не вказано'
+        })
+
+    return jsonify({'report': report_data})
+"""
+#******************************************************
+
 
 @app.route('/export/report_period', methods=['GET'])
 @login_required
@@ -1651,6 +1714,62 @@ def mass_add_cartridge_events():
     return Response(buffer.getvalue(), mimetype='application/pdf',
                     headers={"Content-Disposition": "attachment;filename=mass_refill_report.pdf"})
 
+
+@app.route('/api/barcodes_all', methods=['GET'])
+@login_required
+def generate_all_barcodes():
+    search_query = request.args.get('search', '')
+    cartridges = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search_query}%')).all()
+
+    if not cartridges:
+        return jsonify({"error": "Немає картриджів для генерації"}), 404
+
+    # Налаштування розмірів
+    label_width = 80 * mm
+    label_height = 25 * mm
+    gap = 2 * mm
+
+    # Створення PDF у пам'яті
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=(label_width, label_height))
+
+    for cartridge in cartridges:
+        serial_num = str(cartridge.serial_num)
+        barcode_serial = translit(serial_num, 'uk', reversed=True) if any(c.isalpha() and ord(c) > 127 for c in serial_num) else serial_num
+
+        # Логотип Укрпошти
+        logo_path = os.path.join(app.static_folder, 'ukrposhta_logo.png')
+        if os.path.exists(logo_path):
+            c.drawImage(logo_path, 2 * mm, 2 * mm, width=20 * mm, height=20 * mm, preserveAspectRatio=True)
+
+        # Генерація штрих-коду Code 128
+        barcode = Code128(barcode_serial, writer=ImageWriter())
+        barcode_path = os.path.join(app.static_folder, f'temp_barcode_{cartridge.id}')
+        barcode.save(barcode_path, options={"write_text": False, "module_height": 15, "module_width": 0.4})
+        barcode_img_path = f"{barcode_path}.png"
+
+        # Розміщення штрих-коду
+        barcode_x = 25 * mm
+        barcode_y = 6 * mm
+        c.drawImage(barcode_img_path, barcode_x, barcode_y, width=50 * mm, height=15 * mm)
+
+        # Текст під штрих-кодом
+        c.setFont("Helvetica", 8)
+        text_x = barcode_x + (50 * mm - c.stringWidth(serial_num, "Helvetica", 8)) / 2
+        text_y = 2 * mm
+        c.drawString(text_x, text_y, serial_num)
+
+        # Нова сторінка для наступного картриджа
+        c.showPage()
+
+        # Очищення тимчасового файлу
+        if os.path.exists(barcode_img_path):
+            os.remove(barcode_img_path)
+
+    # Завершення PDF
+    c.save()
+    buffer.seek(0)
+    return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=f"all_barcodes_{datetime.now().strftime('%Y-%m-%d')}.pdf")
 
 
 if __name__ == '__main__':
