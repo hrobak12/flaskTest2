@@ -93,8 +93,8 @@ def refill_depts():
 
 
 @app.route('/add_refill_dept', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def add_refill_dept():
     if request.method == 'POST':
         deptname = request.form['deptname']
@@ -121,8 +121,8 @@ def add_refill_dept():
 
 
 @app.route('/edit_refill_dept/<int:dept_id>', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def edit_refill_dept(dept_id):
     dept = RefillDept.query.get_or_404(dept_id)
     if request.method == 'POST':
@@ -145,8 +145,8 @@ def edit_refill_dept(dept_id):
     return render_template('edit_refill_dept.html', dept=dept)
 
 @app.route('/delete_refill_dept/<int:dept_id>', methods=['POST'])
-@admin_required
 @login_required
+@admin_required
 def delete_refill_dept(dept_id):
     dept = RefillDept.query.get_or_404(dept_id)
     db.session.delete(dept)
@@ -175,8 +175,8 @@ def printer_models():
                            search=search)
 
 @app.route('/add_printer_model', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def add_printer_model():
     if request.method == 'POST':
         model_name = request.form['model_name']
@@ -192,8 +192,8 @@ def add_printer_model():
     return render_template('add_printer_model.html')
 
 @app.route('/edit_printer_model/<int:model_id>', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def edit_printer_model(model_id):
     model = PrinterModel.query.get_or_404(model_id)
     if request.method == 'POST':
@@ -210,8 +210,8 @@ def edit_printer_model(model_id):
     return render_template('edit_printer_model.html', model=model)
 
 @app.route('/delete_printer_model/<int:model_id>', methods=['POST'])
-@admin_required
 @login_required
+@admin_required
 def delete_printer_model(model_id):
     model = PrinterModel.query.get_or_404(model_id)
     db.session.delete(model)
@@ -253,8 +253,8 @@ def equipments():
                            pagination=pagination)
 
 @app.route('/add_equipment', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def add_equipment():
     if request.method == 'POST':
         print_model = request.form['print_model']
@@ -280,8 +280,8 @@ def add_equipment():
     return render_template('add_equipment.html', models=models, depts=depts)
 
 @app.route('/edit_equipment/<int:equip_id>', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def edit_equipment(equip_id):
     equip = CustomerEquipment.query.get_or_404(equip_id)
     if request.method == 'POST':
@@ -307,8 +307,8 @@ def edit_equipment(equip_id):
     return render_template('edit_equipment.html', equip=equip, models=models, depts=depts)
 
 @app.route('/delete_equipment/<int:equip_id>', methods=['POST'])
-@admin_required
 @login_required
+@admin_required
 def delete_equipment(equip_id):
     equip = CustomerEquipment.query.get_or_404(equip_id)
     db.session.delete(equip)
@@ -339,8 +339,8 @@ def cartridges():
                            pagination=pagination)
 
 @app.route('/add_cartridge', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def add_cartridge():
     if request.method == 'POST':
         serial_num = request.form['serial_num']
@@ -449,6 +449,7 @@ def delete_cartridge(cartridge_id):
 # Основний маршрут для відображення подій
 @app.route('/cartridge_status')
 @login_required
+@admin_required
 def cartridge_status():
     search = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)
@@ -509,8 +510,8 @@ def delete_status(status_id):
 
 # Перегляд логів подій
 @app.route('/event_log')
-@admin_required
 @login_required
+@admin_required
 def event_log():
     table_filter = request.args.get('table_filter', '')
     type_filter = request.args.get('type_filter', '')
@@ -524,8 +525,8 @@ def event_log():
 
 # Додавання користувача
 @app.route('/users')
-@admin_required
 @login_required
+@admin_required
 def users():
     search = request.args.get('search', '')
     users_list = User.query.filter(User.username.ilike(f'%{search}%')).all()
@@ -533,8 +534,8 @@ def users():
 
 
 @app.route('/add_user', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def add_user():
     if request.method == 'POST':
         username = request.form['username']
@@ -554,8 +555,8 @@ def add_user():
     return render_template('add_user.html', depts=RefillDept.query.all())  # Передаємо список відділів
 
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     if request.method == 'POST':
@@ -577,8 +578,8 @@ def edit_user(user_id):
     return render_template('edit_user.html', user=user, depts=RefillDept.query.all())  # Передаємо список відділів
 
 @app.route('/delete_user/<int:user_id>', methods=['POST'])
-@admin_required
 @login_required
+@admin_required
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     if user.id == current_user.id:
@@ -606,8 +607,8 @@ def cartridge_models():
                            PrinterModel=PrinterModel)  # Додаємо PrinterModel для відображення назви принтера
 
 @app.route('/add_cartridge_model', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def add_cartridge_model():
     if request.method == 'POST':
         model_name = request.form['model_name']
@@ -630,8 +631,8 @@ def add_cartridge_model():
     return render_template('add_cartridge_model.html', printer_models=PrinterModel.query.all())  # Передаємо список моделей принтерів
 
 @app.route('/edit_cartridge_model/<int:model_id>', methods=['GET', 'POST'])
-@admin_required
 @login_required
+@admin_required
 def edit_cartridge_model(model_id):
     model = CartridgeModel.query.get_or_404(model_id)
     if request.method == 'POST':
@@ -650,8 +651,8 @@ def edit_cartridge_model(model_id):
     return render_template('edit_cartridge_model.html', model=model, printer_models=PrinterModel.query.all())  # Передаємо список моделей принтерів
 
 @app.route('/delete_cartridge_model/<int:model_id>', methods=['POST'])
-@admin_required
 @login_required
+@admin_required
 def delete_cartridge_model(model_id):
     model = CartridgeModel.query.get_or_404(model_id)
     db.session.delete(model)
@@ -1384,6 +1385,7 @@ pdfmetrics.registerFont(TTFont('TimesNewRomanBold', 'static/ttf/Timesbd.ttf'))  
 
 @app.route('/generate_shipping_label/<int:dept_id>', methods=['GET'])
 @login_required
+@admin_required
 def generate_shipping_label(dept_id):
     # Отримуємо відділ відправника (з dept_id поточного користувача)
     sender_dept = RefillDept.query.get_or_404(current_user.dept_id)
@@ -1717,6 +1719,7 @@ def mass_add_cartridge_events():
 
 @app.route('/api/barcodes_all', methods=['GET'])
 @login_required
+@admin_required
 def generate_all_barcodes():
     search_query = request.args.get('search', '')
     cartridges = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search_query}%')).all()

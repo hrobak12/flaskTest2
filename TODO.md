@@ -1,3 +1,9 @@
+помилка: спроба зайти незалогіненим на сторінки тільки для адміна
+AttributeError
+AttributeError: 'AnonymousUserMixin' object has no attribute 'role'
+
+
+
 # у деяких принтерах буває 2 картриджі: драм і тонер. треба реалізувати.
 # чомусь в таблиці cartridges, колонка serial_num є int, а має бути VARCHAR(255) треба змінити
 
