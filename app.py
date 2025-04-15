@@ -1641,56 +1641,89 @@ def mass_input():
 def mass_add_cartridge_events():
     data = request.get_json()
     exec_dept = data.get('exec_dept')
-    status = data.get('status')
+    status = int(data.get('status'))
     serial_nums = data.get('serial_nums', [])
+    parcel_track = data.get('parcel_track', '')
+    printer = data.get('printer', None)
 
     if not exec_dept or not serial_nums:
         return jsonify({'success': False, 'message': 'Необхідно вказати відділ і хоча б один картридж!'}), 400
 
-    # Перевірка відділу
-    dept = RefillDept.query.filter_by(id=exec_dept, is_exec=1).first()
-    if not dept:
-        return jsonify({'success': False, 'message': 'Недійсний відділ заправки!'}), 400
+    # Перевірка відділу (для заправки лише is_exec=1)
+    is_exec_required = status in [3, 6]  # На заправку або прийом заправлених
+    dept = RefillDept.query.filter_by(id=exec_dept).first()
+    if not dept or (is_exec_required and dept.is_exec != 1):
+        return jsonify({'success': False, 'message': 'Недійсний відділ для цієї операції!'}), 400
 
-    # Обробка картриджів
+    # Оптимізоване завантаження картриджів одним запитом
+    cartridges = Cartridges.query.filter(Cartridges.serial_num.in_(serial_nums)).all()
+    cartridge_dict = {c.serial_num: c for c in cartridges}
+
     report_data = []
-    for serial_num in serial_nums:
-        cartridge = Cartridges.query.filter_by(serial_num=serial_num).first()
-        if cartridge:
-            # Оновлення стану в Cartridges
-            cartridge.curr_status = int(status)
-            cartridge.curr_dept = int(exec_dept)
-            cartridge.user_updated = current_user.id
-            cartridge.time_updated = datetime.now()
+    invalid_cartridges = []
+    status_checks = {
+        2: lambda c: c.curr_status == 6,  # Видача заправлених: лише із заправлених
+        3: lambda c: c.curr_status == 1,  # Видача порожніх: лише із порожніх
+        6: lambda c: c.curr_status == 3,  # Прийом заправлених: лише із "Відправлено на заправку"
+        1: lambda c: c.curr_status == 2   # Прийом порожніх: із "Відправлено в користування"
+    }
 
-            # Додавання події в CartridgeStatus
-            new_status = CartridgeStatus(
-                cartridge_id=cartridge.id,
-                status=int(status),
-                date_ofchange=datetime.now(),
-                exec_dept=int(exec_dept),
-                user_updated=current_user.id,
-                time_updated=datetime.now()
-            )
-            db.session.add(new_status)
-            report_data.append({
-                'serial_num': cartridge.serial_num,
-                'cartridge_model': cartridge.cartridge_model or 'Не вказано',
-                'date_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            })
+    for serial_num in serial_nums:
+        cartridge = cartridge_dict.get(serial_num)
+        if not cartridge:
+            invalid_cartridges.append(serial_num)
+            continue
+        if not status_checks[status](cartridge):
+            invalid_cartridges.append(serial_num)
+            continue
+
+        # Оновлення стану картриджа
+        cartridge.curr_status = status
+        cartridge.curr_dept = int(exec_dept)
+        cartridge.curr_parcel_track = parcel_track if status == 3 else None
+        cartridge.in_printer = int(printer) if printer and status == 2 else None
+        cartridge.user_updated = current_user.id
+        cartridge.time_updated = datetime.now()
+
+        # Додавання події в історію
+        new_status = CartridgeStatus(
+            cartridge_id=cartridge.id,
+            status=status,
+            date_ofchange=datetime.now(),
+            exec_dept=int(exec_dept),
+            parcel_track=parcel_track if status == 3 else None,
+            user_updated=current_user.id,
+            time_updated=datetime.now()
+        )
+        db.session.add(new_status)
+        report_data.append({
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+            'date_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+
+    if invalid_cartridges:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Недійсні картриджі або статуси: {", ".join(invalid_cartridges)}'}), 400
 
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'Помилка: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'Помилка збереження: {str(e)}'}), 500
 
     # Генерація PDF-звіту
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
     p.setFont("TimesNewRoman", 12)
-    p.drawString(100, 800, "Звіт про масове відправлення картриджів")
-    p.drawString(100, 780, f"Відділ заправки: {dept.deptname}")
+    status_titles = {
+        2: "Видача заправлених картриджів",
+        3: "Видача порожніх картриджів на заправку",
+        6: "Прийом заправлених картриджів",
+        1: "Прийом порожніх картриджів"
+    }
+    p.drawString(100, 800, f"Звіт: {status_titles.get(status, 'Масова операція')}")
+    p.drawString(100, 780, f"Відділ: {dept.deptname}")
     p.drawString(100, 760, f"Дата: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     y = 740
@@ -1700,7 +1733,7 @@ def mass_add_cartridge_events():
     y -= 20
 
     for item in report_data:
-        if y < 50:  # Перехід на нову сторінку
+        if y < 50:
             p.showPage()
             p.setFont("TimesNewRoman", 12)
             y = 800
@@ -1714,7 +1747,8 @@ def mass_add_cartridge_events():
     buffer.seek(0)
 
     return Response(buffer.getvalue(), mimetype='application/pdf',
-                    headers={"Content-Disposition": "attachment;filename=mass_refill_report.pdf"})
+                    headers={"Content-Disposition": f"attachment;filename=mass_operation_{status}_report.pdf"})
+
 
 
 @app.route('/api/barcodes_all', methods=['GET'])
@@ -1774,6 +1808,17 @@ def generate_all_barcodes():
     buffer.seek(0)
     return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=f"all_barcodes_{datetime.now().strftime('%Y-%m-%d')}.pdf")
 
+
+@app.route('/api/departments', methods=['GET'])
+@login_required
+def get_departments():
+    departments = RefillDept.query.all()
+    return jsonify({
+        'departments': [
+            {'id': dept.id, 'deptname': dept.deptname, 'is_exec': dept.is_exec}
+            for dept in departments
+        ]
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

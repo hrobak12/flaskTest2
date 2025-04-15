@@ -1,23 +1,43 @@
 {% extends "base.html" %}
 {% block title %}Масовий ввід картриджів{% endblock %}
 {% block content %}
-    <h1>Масовий ввід картриджів</h1>
-    <h2><a href="#" class="process-link" onclick="massInputModal.show(); return false;">Натисніть сюди</a> для масового відправлення картриджів на заправку</h2>
-    <h2><a href="#" class="process-link" onclick="massReceiveModal.show(); return false;">Натисніть сюди</a> для масового отримання картриджів із заправки</h2>
+<h1>Масовий ввід картриджів</h1>
 
-    <!-- Модальне вікно для масового вводу -->
-    <div class="modal fade" id="massInputModal" tabindex="-1" aria-labelledby="massInputModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title" id="massInputModalLabel">Масове відправлення картриджів на заправку</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
+<div class="row mt-4">
+    <!-- Секція Видача -->
+    <div class="col-md-6">
+        <h3>Видача картриджів</h3>
+        <div class="card p-3 mb-3">
+            <button class="btn btn-primary mb-2" onclick="openMassModal('issue_filled', 2)">Видача заправлених (на відділи)</button>
+            <button class="btn btn-warning" onclick="openMassModal('issue_empty', 3)">Видача порожніх (на заправку)</button>
+        </div>
+    </div>
+    <!-- Секція Прийом -->
+    <div class="col-md-6">
+        <h3>Прийом картриджів</h3>
+        <div class="card p-3 mb-3">
+            <button class="btn btn-success mb-2" onclick="openMassModal('receive_filled', 6)">Прийом заправлених (із заправки)</button>
+            <button class="btn btn-secondary" onclick="openMassModal('receive_empty', 1)">Прийом порожніх (на заправку)</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальне вікно для масового введення -->
+<div class="modal fade" id="massInputModal" tabindex="-1" aria-labelledby="massInputModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="massInputModalLabel">Масова обробка картриджів</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="massInputForm">
+                    <input type="hidden" id="operation_type" name="operation_type">
+                    <input type="hidden" id="status" name="status">
                     <div class="mb-3 position-relative">
-                        <label for="mass_serial_num" class="form-label">Введіть або відскануйте</label>
-                        <input type="text" class="form-control" id="mass_serial_num" name="mass_serial_num" placeholder="Серійний номер" required autofocus>
-                        <div id="mass-serial-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
+                        <label for="serial_num" class="form-label">Введіть або відскануйте серійний номер</label>
+                        <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Серійний номер" required autofocus>
+                        <div id="serial-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
                     </div>
                     <div class="card">
                         <div class="card-body p-0">
@@ -39,273 +59,260 @@
                         </div>
                     </div>
                     <div class="mt-3">
-                        <label for="exec_dept" class="form-label">Відділ заправки</label>
+                        <label for="exec_dept" class="form-label">Відділ</label>
                         <select class="form-select" id="exec_dept" name="exec_dept" required>
                             <option value="">Виберіть відділ</option>
-                            {% for dept in RefillDept.query.filter_by(is_exec=1).all()|sort(attribute='deptname') %}
-                                <option value="{{ dept.id }}">{{ dept.deptname }}</option>
-                            {% endfor %}
                         </select>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="sendMassInput">Відправити</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
-                </div>
+                    <div class="mt-3" id="printer_field" style="display: none;">
+                        <label for="printer" class="form-label">Принтер</label>
+                        <select class="form-select" id="printer" name="printer" disabled>
+                            <option value="">Спочатку виберіть відділ</option>
+                        </select>
+                    </div>
+                    <div class="mt-3" id="parcel_track_field" style="display: none;">
+                        <label for="parcel_track" class="form-label">Трек-номер (необов’язково)</label>
+                        <input type="text" class="form-control" id="parcel_track" name="parcel_track" maxlength="13" placeholder="Трек-номер">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ukrposhta me-auto" id="printLabelBtn" style="display: none;">Друкувати ярлик</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="button" class="btn btn-primary" id="confirmMassInput">Підтвердити</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Модальне вікно для масового отримання -->
-    <div class="modal fade" id="massReceiveModal" tabindex="-1" aria-labelledby="massReceiveModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title" id="massReceiveModalLabel">Масове отримання картриджів із заправки</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3 position-relative">
-                        <label for="mass_receive_serial_num" class="form-label">Введіть або відскануйте</label>
-                        <input type="text" class="form-control" id="mass_receive_serial_num" name="mass_receive_serial_num" placeholder="Серійний номер" required autofocus>
-                        <div id="mass-receive-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
-                    </div>
-                    <div class="card">
-                        <div class="card-body p-0">
-                            <div style="max-height: 300px; overflow-y: auto;">
-                                <table class="table table-striped mb-0" id="mass-receive-table">
-                                    <thead class="sticky-header">
-                                        <tr>
-                                            <th class="col-serial">Серійний номер</th>
-                                            <th class="col-model">Модель картриджа</th>
-                                            <th class="col-date">Дата/Час</th>
-                                            <th class="col-action">Дія</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="mass-receive-table-body">
-                                        <!-- Дані додаються через JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <label for="receive_dept" class="form-label">Підрозділ</label>
-                        <select class="form-select" id="receive_dept" name="receive_dept" disabled required>
-                            <option value="{{ current_user.dept_id }}" selected>{{ RefillDept.query.get(current_user.dept_id).deptname }}</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="sendMassReceive">Отримати</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Стилі -->
-    <style>
-        .sticky-header {
-            position: sticky;
-            top: 0;
-            background-color: #f8f9fa;
-            z-index: 1;
-        }
-        .sticky-header th {
-            border-bottom: 2px solid #dee2e6;
-        }
-        .col-serial { width: 30%; }
-        .col-model { width: 30%; }
-        .col-date { width: 30%; }
-        .col-action { width: 10%; }
-        .btn-delete {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 2px 6px;
-            font-size: 12px;
-            line-height: 1;
-        }
-        .btn-delete:hover {
-            background-color: #c82333;
-        }
-        .mass-serial-suggestions.show {
-            display: block;
-        }
-        .mass-serial-suggestions {
-            word-break: break-word;
-            white-space: normal;
-            overflow-x: hidden;
-        }
-        .mass-serial-suggestions .dropdown-item {
-            white-space: normal;
-            overflow-x: hidden;
-        }
-    </style>
+<style>
+    .btn-primary { background-color: #007bff; border-color: #007bff; }
+    .btn-warning { background-color: #ffc107; border-color: #ffc107; color: #000; }
+    .btn-success { background-color: #28a745; border-color: #28a745; }
+    .btn-secondary { background-color: #6c757d; border-color: #6c757d; }
+    .btn-ukrposhta {
+        background-color: #FFC107; /* Жовтий фон, як у Укрпошти */
+        border-color: #FFC107;
+    }
+    .btn-ukrposhta:hover,
+    .btn-ukrposhta:active,
+    .btn-ukrposhta:focus {
+        background-color: #e0a800; /* Темніший відтінок при наведенні, натисканні, фокусі */
+        border-color: #e0a800;
+        outline: none; /* Прибираємо обведення при фокусі */
+    }
+    .sticky-header {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 1;
+    }
+    .sticky-header th {
+        border-bottom: 2px solid #dee2e6;
+    }
+    .col-serial { width: 30%; }
+    .col-model { width: 30%; }
+    .col-date { width: 30%; }
+    .col-action { width: 10%; }
+    .btn-delete {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        padding: 2px 6px;
+        font-size: 12px;
+        line-height: 1;
+    }
+    .btn-delete:hover {
+        background-color: #c82333;
+    }
+    .serial-suggestions.show { display: block; }
+    .serial-suggestions {
+        word-break: break-word;
+        white-space: normal;
+        overflow-x: hidden;
+    }
+    .serial-suggestions .dropdown-item {
+        white-space: normal;
+        overflow-x: hidden;
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
-    <script>
-        const massInputModal = new bootstrap.Modal(document.getElementById('massInputModal'));
-        const serialInput = document.getElementById('mass_serial_num');
-        const suggestionsDropdown = document.getElementById('mass-serial-suggestions');
-        const tableBody = document.getElementById('mass-input-table-body');
-        const execDeptSelect = document.getElementById('exec_dept');
-        let cartridges = [];
-        let selectedIndex = -1;
+<script>
+    const massInputModal = new bootstrap.Modal(document.getElementById('massInputModal'));
+    const serialInput = document.getElementById('serial_num');
+    const suggestionsDropdown = document.getElementById('serial-suggestions');
+    const tableBody = document.getElementById('mass-input-table-body');
+    const execDeptSelect = document.getElementById('exec_dept');
+    const printerSelect = document.getElementById('printer');
+    const parcelTrackField = document.getElementById('parcel_track_field');
+    const printerField = document.getElementById('printer_field');
+    const printLabelBtn = document.getElementById('printLabelBtn');
 
-        // Очищення при закритті модального вікна
-        document.getElementById('massInputModal').addEventListener('hidden.bs.modal', () => {
-            serialInput.value = '';
-            suggestionsDropdown.innerHTML = '';
-            suggestionsDropdown.classList.remove('show');
-            tableBody.innerHTML = '';
-            execDeptSelect.value = '';
-            cartridges = [];
-            selectedIndex = -1;
-        });
+    let cartridges = [];
+    let currentOperation = '';
+    let currentStatus = 0;
+    let selectedIndex = -1;
 
-        // Фокус на поле вводу при відкритті
-        document.getElementById('massInputModal').addEventListener('shown.bs.modal', () => {
-            serialInput.focus();
-        });
+    // Масив для всіх відділів
+    let allDepts = [];
 
-        // Обробка введення серійного номера з автодоповненням
-        serialInput.addEventListener('input', debounce((e) => {
-            const query = e.target.value.trim();
-            if (query.length >= 2) {
-                fetch(`/api/cartridges?search=${encodeURIComponent(query)}`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                })
+    // Завантаження відділів при ініціалізації
+    fetch('/api/departments')
+        .then(response => response.json())
+        .then(data => {
+            allDepts = data.departments; // Очікуємо формат: [{id, deptname, is_exec}, ...]
+        })
+        .catch(error => console.error('Помилка завантаження відділів:', error));
+
+    // Відкриття модального вікна
+    function openMassModal(operation, status) {
+        currentOperation = operation;
+        currentStatus = status;
+        document.getElementById('operation_type').value = operation;
+        document.getElementById('status').value = status;
+        document.getElementById('massInputModalLabel').textContent = getModalTitle(operation);
+
+        // Налаштування полів
+        parcelTrackField.style.display = (operation === 'issue_empty') ? 'block' : 'none';
+        printerField.style.display = (operation === 'issue_filled') ? 'block' : 'none';
+        printLabelBtn.style.display = (operation === 'issue_empty') ? 'inline-block' : 'none';
+
+        // Очищення
+        cartridges = [];
+        tableBody.innerHTML = '';
+        document.getElementById('massInputForm').reset();
+        suggestionsDropdown.innerHTML = '';
+        suggestionsDropdown.classList.remove('show');
+        printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
+        printerSelect.disabled = true;
+
+        // Заповнення відділів
+        execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
+        const deptsToShow = (operation === 'issue_empty' || operation === 'receive_filled')
+            ? allDepts.filter(dept => dept.is_exec === 1)
+            : allDepts;
+        deptsToShow
+            .sort((a, b) => a.deptname.localeCompare(b.deptname))
+            .forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept.id;
+                option.textContent = dept.deptname;
+                execDeptSelect.appendChild(option);
+            });
+
+        massInputModal.show();
+    }
+
+    // Заголовок модального вікна
+    function getModalTitle(operation) {
+        switch (operation) {
+            case 'issue_filled': return 'Видача заправлених картриджів';
+            case 'issue_empty': return 'Видача порожніх картриджів на заправку';
+            case 'receive_filled': return 'Прийом заправлених картриджів';
+            case 'receive_empty': return 'Прийом порожніх картриджів';
+            default: return 'Масова обробка картриджів';
+        }
+    }
+
+    // Фокус при відкритті
+    document.getElementById('massInputModal').addEventListener('shown.bs.modal', () => {
+        serialInput.focus();
+    });
+
+    // Очищення при закритті
+    document.getElementById('massInputModal').addEventListener('hidden.bs.modal', () => {
+        document.getElementById('massInputForm').reset();
+        suggestionsDropdown.innerHTML = '';
+        suggestionsDropdown.classList.remove('show');
+        tableBody.innerHTML = '';
+        cartridges = [];
+        selectedIndex = -1;
+        printerField.style.display = 'none';
+        parcelTrackField.style.display = 'none';
+        printLabelBtn.style.display = 'none';
+        printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
+        printerSelect.disabled = true;
+    });
+
+    // Автодоповнення
+    serialInput.addEventListener('input', debounce((e) => {
+        const query = e.target.value.trim();
+        if (query.length >= 2) {
+            fetch(`/api/cartridges?search=${encodeURIComponent(query)}`)
                 .then(response => response.json())
                 .then(data => updateSuggestions(data.cartridges))
                 .catch(error => console.error('Помилка:', error));
-            } else {
-                suggestionsDropdown.innerHTML = '';
-                suggestionsDropdown.classList.remove('show');
-            }
-        }, 300));
-
-        // Обробка клавіатури для навігації по пропозиціях
-        serialInput.addEventListener('keydown', (e) => {
-            const items = suggestionsDropdown.querySelectorAll('.dropdown-item');
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                if (selectedIndex >= 0 && items[selectedIndex]) {
-                    items[selectedIndex].click();
-                } else {
-                    const serialNum = serialInput.value.trim();
-                    if (serialNum) {
-                        checkCartridge(serialNum);
-                    }
-                }
-            } else if (items.length > 0) {
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-                    updateSelection(items);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    selectedIndex = Math.max(selectedIndex - 1, -1);
-                    updateSelection(items);
-                }
-            }
-        });
-
-        // Оновлення пропозицій у dropdown
-        function updateSuggestions(cartridges) {
+        } else {
             suggestionsDropdown.innerHTML = '';
-            selectedIndex = -1;
-            if (cartridges.length > 0) {
-                cartridges.forEach(cartridge => {
-                    const item = document.createElement('a');
-                    item.classList.add('dropdown-item');
-                    item.href = '#';
-                    item.textContent = `${cartridge.serial_num} (${cartridge.cartridge_model || 'Без моделі'})`;
-                    item.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        serialInput.value = cartridge.serial_num;
-                        suggestionsDropdown.innerHTML = '';
-                        suggestionsDropdown.classList.remove('show');
-                        checkCartridge(cartridge.serial_num);
-                    });
-                    suggestionsDropdown.appendChild(item);
-                });
-                suggestionsDropdown.classList.add('show');
+            suggestionsDropdown.classList.remove('show');
+        }
+    }, 300));
+
+    // Обробка клавіатури
+    serialInput.addEventListener('keydown', (e) => {
+        const items = suggestionsDropdown.querySelectorAll('.dropdown-item');
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIndex >= 0 && items[selectedIndex]) {
+                items[selectedIndex].click();
             } else {
-                suggestionsDropdown.classList.remove('show');
-            }
-        }
-
-        // Оновлення виділення в dropdown
-        function updateSelection(items) {
-            items.forEach((item, index) => {
-                item.classList.toggle('active', index === selectedIndex);
-            });
-            if (selectedIndex >= 0) {
-                items[selectedIndex].scrollIntoView({ block: 'nearest' });
-            }
-        }
-
-        // Debounce-функція для затримки запитів
-        function debounce(func, wait) {
-            let timeout;
-            return function (...args) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), wait);
-            };
-        }
-
-        // Перевірка картриджа
-        // Перевірка картриджа
-        function checkCartridge(serialNum) {
-            fetch('/check_cartridge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serial_num: serialNum })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Перевірка статусу "Відправлено на заправку" (status = 3)
-                    fetch(`/api/cartridges?search=${encodeURIComponent(serialNum)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const cartridge = data.cartridges.find(c => c.serial_num === serialNum);
-                        if (cartridge && cartridge.curr_status === 3) {
-                            const label = document.querySelector('label[for="mass_serial_num"]');
-                            label.classList.add('double-blink');
-                            setTimeout(() => label.classList.remove('double-blink'), 1200);
-                            serialInput.value = '';
-                            serialInput.focus();
-                        } else {
-                            fetchCartridgeDetails(serialNum);
-                        }
-                    })
-                    .catch(error => console.error('Помилка:', error));
-                } else {
-                    const label = document.querySelector('label[for="mass_serial_num"]');
-                    label.classList.add('double-blink');
-                    setTimeout(() => label.classList.remove('double-blink'), 1200);
-                    serialInput.value = '';
-                    serialInput.focus();
+                const serialNum = serialInput.value.trim();
+                if (serialNum) {
+                    fetchCartridgeDetails(serialNum);
                 }
-            })
-            .catch(error => {
-                console.error('Помилка:', error);
-                const label = document.querySelector('label[for="mass_serial_num"]');
-                label.classList.add('double-blink');
-                setTimeout(() => label.classList.remove('double-blink'), 1200);
-                serialInput.value = '';
-                serialInput.focus();
-            });
+            }
+        } else if (items.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(items);
+            }
         }
+    });
 
+    // Оновлення пропозицій автодоповнення
+    function updateSuggestions(cartridgesData) {
+        suggestionsDropdown.innerHTML = '';
+        selectedIndex = -1;
+        if (cartridgesData.length > 0) {
+            cartridgesData.forEach(cartridge => {
+                const item = document.createElement('a');
+                item.classList.add('dropdown-item');
+                item.href = '#';
+                item.textContent = `${cartridge.serial_num} (${cartridge.cartridge_model || 'Без моделі'})`;
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    serialInput.value = cartridge.serial_num;
+                    suggestionsDropdown.innerHTML = '';
+                    suggestionsDropdown.classList.remove('show');
+                    fetchCartridgeDetails(cartridge.serial_num);
+                });
+                suggestionsDropdown.appendChild(item);
+            });
+            suggestionsDropdown.classList.add('show');
+        } else {
+            suggestionsDropdown.classList.remove('show');
+        }
+    }
+
+    // Оновлення виділення в автодоповненні
+    function updateSelection(items) {
+        items.forEach((item, index) => {
+            item.classList.toggle('active', index === selectedIndex);
+        });
+        if (selectedIndex >= 0) {
+            items[selectedIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
         // Отримання деталей картриджа
-        function fetchCartridgeDetails(serialNum) {
-            fetch(`/api/cartridges?search=${encodeURIComponent(serialNum)}`)
+    function fetchCartridgeDetails(serialNum) {
+        fetch(`/api/cartridges?search=${encodeURIComponent(serialNum)}`)
             .then(response => response.json())
             .then(data => {
                 const cartridge = data.cartridges.find(c => c.serial_num === serialNum);
@@ -319,297 +326,140 @@
                     serialInput.value = '';
                     serialInput.focus();
                 } else {
-                    const label = document.querySelector('label[for="mass_serial_num"]');
+                    const label = document.querySelector('label[for="serial_num"]');
                     label.classList.add('double-blink');
                     setTimeout(() => label.classList.remove('double-blink'), 1200);
                     serialInput.value = '';
                     serialInput.focus();
                 }
             })
-            .catch(error => console.error('Помилка:', error));
-        }
-
-        // Оновлення таблиці
-        function updateTable() {
-            tableBody.innerHTML = '';
-            cartridges.forEach((cartridge, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${cartridge.serial_num}</td>
-                    <td>${cartridge.cartridge_model}</td>
-                    <td>${cartridge.date_time}</td>
-                    <td><button class="btn btn-delete" onclick="removeCartridge(${index})">✖</button></td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-
-        // Видалення рядка
-        window.removeCartridge = function(index) {
-            cartridges.splice(index, 1);
-            updateTable();
-            serialInput.focus();
-        };
-
-        // Відправка даних
-        document.getElementById('sendMassInput').addEventListener('click', () => {
-            if (cartridges.length === 0) {
-                alert('Додайте хоча б один картридж!');
-                return;
-            }
-            if (!execDeptSelect.value) {
-                alert('Виберіть відділ заправки!');
-                return;
-            }
-            if (confirm('Ви впевнені?')) {
-                const payload = {
-                    exec_dept: execDeptSelect.value,
-                    status: 3, // "Відправлено на заправку"
-                    serial_nums: cartridges.map(c => c.serial_num)
-                };
-
-                fetch('/mass_add_cartridge_events', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                })
-                .then(response => response.blob())
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `mass_refill_report_${new Date().toISOString().slice(0,10)}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                    massInputModal.hide();
-                    //fetchInTransitCartridges(); // Оновлення таблиці "В дорозі"
-                })
-                .catch(error => alert('Помилка: ' + error));
-            }
-        });
-
-//*******************************
-        // Логіка для масового отримання
-        const massReceiveModal = new bootstrap.Modal(document.getElementById('massReceiveModal'));
-        const receiveSerialInput = document.getElementById('mass_receive_serial_num');
-        const receiveSuggestionsDropdown = document.getElementById('mass-receive-suggestions');
-        const receiveTableBody = document.getElementById('mass-receive-table-body');
-        const receiveDeptSelect = document.getElementById('receive_dept');
-        let receiveCartridges = [];
-        let receiveSelectedIndex = -1;
-
-        // Очищення при закритті модального вікна
-        document.getElementById('massReceiveModal').addEventListener('hidden.bs.modal', () => {
-            receiveSerialInput.value = '';
-            receiveSuggestionsDropdown.innerHTML = '';
-            receiveSuggestionsDropdown.classList.remove('show');
-            receiveTableBody.innerHTML = '';
-            receiveCartridges = [];
-            receiveSelectedIndex = -1;
-        });
-
-        // Фокус на поле вводу при відкритті
-        document.getElementById('massReceiveModal').addEventListener('shown.bs.modal', () => {
-            receiveSerialInput.focus();
-        });
-
-        // Обробка введення серійного номера з автодоповненням
-        receiveSerialInput.addEventListener('input', debounce((e) => {
-            const query = e.target.value.trim();
-            if (query.length >= 2) {
-                fetch(`/api/cartridges?search=${encodeURIComponent(query)}`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                .then(response => response.json())
-                .then(data => updateReceiveSuggestions(data.cartridges))
-                .catch(error => console.error('Помилка:', error));
-            } else {
-                receiveSuggestionsDropdown.innerHTML = '';
-                receiveSuggestionsDropdown.classList.remove('show');
-            }
-        }, 300));
-
-        // Обробка клавіатури для навігації по пропозиціях
-        receiveSerialInput.addEventListener('keydown', (e) => {
-            const items = receiveSuggestionsDropdown.querySelectorAll('.dropdown-item');
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                if (receiveSelectedIndex >= 0 && items[receiveSelectedIndex]) {
-                    items[receiveSelectedIndex].click();
-                } else {
-                    const serialNum = receiveSerialInput.value.trim();
-                    if (serialNum) {
-                        checkReceiveCartridge(serialNum);
-                    }
-                }
-            } else if (items.length > 0) {
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    receiveSelectedIndex = Math.min(receiveSelectedIndex + 1, items.length - 1);
-                    updateReceiveSelection(items);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    receiveSelectedIndex = Math.max(receiveSelectedIndex - 1, -1);
-                    updateReceiveSelection(items);
-                }
-            }
-        });
-
-        // Оновлення пропозицій у dropdown
-        function updateReceiveSuggestions(cartridges) {
-            receiveSuggestionsDropdown.innerHTML = '';
-            receiveSelectedIndex = -1;
-            if (cartridges.length > 0) {
-                cartridges.forEach(cartridge => {
-                    const item = document.createElement('a');
-                    item.classList.add('dropdown-item');
-                    item.href = '#';
-                    item.textContent = `${cartridge.serial_num} (${cartridge.cartridge_model || 'Без моделі'})`;
-                    item.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        receiveSerialInput.value = cartridge.serial_num;
-                        receiveSuggestionsDropdown.innerHTML = '';
-                        receiveSuggestionsDropdown.classList.remove('show');
-                        checkReceiveCartridge(cartridge.serial_num);
-                    });
-                    receiveSuggestionsDropdown.appendChild(item);
-                });
-                receiveSuggestionsDropdown.classList.add('show');
-            } else {
-                receiveSuggestionsDropdown.classList.remove('show');
-            }
-        }
-
-        // Оновлення виділення в dropdown
-        function updateReceiveSelection(items) {
-            items.forEach((item, index) => {
-                item.classList.toggle('active', index === receiveSelectedIndex);
-            });
-            if (receiveSelectedIndex >= 0) {
-                items[receiveSelectedIndex].scrollIntoView({ block: 'nearest' });
-            }
-        }
-
-        // Перевірка картриджа для отримання
-        function checkReceiveCartridge(serialNum) {
-            fetch('/check_cartridge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serial_num: serialNum })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    fetch(`/api/cartridges?search=${encodeURIComponent(serialNum)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const cartridge = data.cartridges.find(c => c.serial_num === serialNum);
-                        if (cartridge && cartridge.curr_status === 3) { // Лише картриджі "Відправлено на заправку"
-                            if (!receiveCartridges.some(c => c.serial_num === serialNum)) {
-                                receiveCartridges.push({
-                                    serial_num: cartridge.serial_num,
-                                    cartridge_model: cartridge.cartridge_model || 'Не вказано',
-                                    date_time: new Date().toLocaleString()
-                                });
-                                updateReceiveTable();
-                                receiveSerialInput.value = '';
-                                receiveSerialInput.focus();
-                            } else {
-                                const label = document.querySelector('label[for="mass_receive_serial_num"]');
-                                label.classList.add('double-blink');
-                                setTimeout(() => label.classList.remove('double-blink'), 1200);
-                                receiveSerialInput.value = '';
-                                receiveSerialInput.focus();
-                            }
-                        } else {
-                            const label = document.querySelector('label[for="mass_receive_serial_num"]');
-                            label.classList.add('double-blink');
-                            setTimeout(() => label.classList.remove('double-blink'), 1200);
-                            receiveSerialInput.value = '';
-                            receiveSerialInput.focus();
-                        }
-                    })
-                    .catch(error => console.error('Помилка:', error));
-                } else {
-                    const label = document.querySelector('label[for="mass_receive_serial_num"]');
-                    label.classList.add('double-blink');
-                    setTimeout(() => label.classList.remove('double-blink'), 1200);
-                    receiveSerialInput.value = '';
-                    receiveSerialInput.focus();
-                }
-            })
             .catch(error => {
                 console.error('Помилка:', error);
-                const label = document.querySelector('label[for="mass_receive_serial_num"]');
+                const label = document.querySelector('label[for="serial_num"]');
                 label.classList.add('double-blink');
                 setTimeout(() => label.classList.remove('double-blink'), 1200);
-                receiveSerialInput.value = '';
-                receiveSerialInput.focus();
+                serialInput.value = '';
+                serialInput.focus();
             });
-        }
+    }
 
-        // Оновлення таблиці отримання
-        function updateReceiveTable() {
-            receiveTableBody.innerHTML = '';
-            receiveCartridges.forEach((cartridge, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${cartridge.serial_num}</td>
-                    <td>${cartridge.cartridge_model}</td>
-                    <td>${cartridge.date_time}</td>
-                    <td><button class="btn btn-delete" onclick="removeReceiveCartridge(${index})">✖</button></td>
-                `;
-                receiveTableBody.appendChild(row);
-            });
-        }
-
-        // Видалення рядка
-        window.removeReceiveCartridge = function(index) {
-            receiveCartridges.splice(index, 1);
-            updateReceiveTable();
-            receiveSerialInput.focus();
-        };
-
-        // Відправка даних для отримання
-        document.getElementById('sendMassReceive').addEventListener('click', () => {
-            if (receiveCartridges.length === 0) {
-                alert('Додайте хоча б один картридж!');
-                return;
-            }
-            if (!receiveDeptSelect.value) {
-                alert('Підрозділ не визначено!');
-                return;
-            }
-            if (confirm('Ви впевнені?')) {
-                const payload = {
-                    exec_dept: receiveDeptSelect.value,
-                    status: 6, // "На зберіганні (заправлений)"
-                    serial_nums: receiveCartridges.map(c => c.serial_num)
-                };
-
-                fetch('/mass_add_cartridge_events', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                })
-                .then(response => response.blob())
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `mass_receive_report_${new Date().toISOString().slice(0,10)}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                    massReceiveModal.hide();
-                })
-                .catch(error => alert('Помилка: ' + error));
-            }
+    // Оновлення таблиці
+    function updateTable() {
+        tableBody.innerHTML = '';
+        cartridges.forEach((cartridge, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${cartridge.serial_num}</td>
+                <td>${cartridge.cartridge_model}</td>
+                <td>${cartridge.date_time}</td>
+                <td><button class="btn btn-delete" onclick="removeCartridge(${index})">✖</button></td>
+            `;
+            tableBody.appendChild(row);
         });
+    }
 
-    </script>
+    // Видалення картриджа
+    window.removeCartridge = function(index) {
+        cartridges.splice(index, 1);
+        updateTable();
+        serialInput.focus();
+    };
+
+    // Завантаження принтерів
+    execDeptSelect.addEventListener('change', () => {
+        const deptId = execDeptSelect.value;
+        if (deptId && currentOperation === 'issue_filled') {
+            fetch(`/api/printers_by_dept/${deptId}`)
+                .then(response => response.json())
+                .then(data => {
+                    printerSelect.innerHTML = '<option value="">Виберіть принтер (необов’язково)</option>';
+                    data.printers.forEach(printer => {
+                        const option = document.createElement('option');
+                        option.value = printer.id;
+                        option.textContent = printer.model_name;
+                        printerSelect.appendChild(option);
+                    });
+                    printerSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Помилка:', error);
+                    printerSelect.innerHTML = '<option value="">Помилка завантаження</option>';
+                    printerSelect.disabled = true;
+                });
+        } else {
+            printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
+            printerSelect.disabled = true;
+        }
+    });
+
+    // Відправка форми
+    document.getElementById('confirmMassInput').addEventListener('click', () => {
+        if (cartridges.length === 0) {
+            alert('Додайте хоча б один картридж!');
+            return;
+        }
+        if (!execDeptSelect.value) {
+            alert('Виберіть відділ!');
+            return;
+        }
+        if (confirm('Ви впевнені?')) {
+            const formData = {
+                exec_dept: execDeptSelect.value,
+                status: currentStatus,
+                serial_nums: cartridges.map(c => c.serial_num),
+                parcel_track: document.getElementById('parcel_track')?.value || '',
+                printer: printerSelect.value || ''
+            };
+
+            fetch('/mass_add_cartridge_events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `mass_${currentOperation}_report.pdf`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                massInputModal.hide();
+            })
+            .catch(error => alert('Помилка: ' + error));
+        }
+    });
+
+    // Друкування ярлика
+    document.getElementById('printLabelBtn').addEventListener('click', () => {
+        const deptId = execDeptSelect.value;
+        if (deptId) {
+            window.open(`/generate_shipping_label/${deptId}`, '_blank');
+        } else {
+            alert('Виберіть відділ!');
+        }
+    });
+
+    // Debounce для автодоповнення
+    function debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    // Стиль для мигання
+    const styleSheet = document.createElement('style');
+    styleSheet.innerHTML = `
+        .double-blink {
+            animation: double-blink 0.4s step-end 2;
+        }
+        @keyframes double-blink {
+            0%, 50% { color: red; }
+            25%, 75%, 100% { color: inherit; }
+        }
+    `;
+    document.head.appendChild(styleSheet);
+</script>
 {% endblock %}

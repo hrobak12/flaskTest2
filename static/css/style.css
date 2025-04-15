@@ -44,3 +44,43 @@ body {
 .double-blink {
     animation: doubleBlink 1.2s ease;
 }
+
+/*mass sending 2*/
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+.btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+.btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+.card {
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+}
+.row .card button {
+    width: 100%;
+    margin-bottom: 10px;
+}
+.serial-suggestions.show {
+    display: block;
+}
+.serial-suggestions {
+    word-break: break-word;
+    white-space: normal;
+    overflow-x: hidden;
+}
+.serial-suggestions .dropdown-item {
+    white-space: normal;
+    overflow-x: hidden;
+}
