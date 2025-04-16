@@ -1,3 +1,34 @@
+"""
+CREATE TABLE cartridges_new (
+	id INTEGER NOT NULL,
+	serial_num VARCHAR(255) DEFAULT '0' NOT NULL,
+	in_printer INTEGER,
+	user_updated INTEGER NOT NULL,
+	time_updated DATETIME DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+	cartridge_model VARCHAR(255),
+	cartrg_model_id INTEGER NOT NULL DEFAULT 1,
+	curr_status INTEGER NOT NULL DEFAULT 0,
+	curr_dept INTEGER NOT NULL DEFAULT 0,
+	curr_parcel_track VARCHAR(13),
+    PRIMARY KEY (id),
+	FOREIGN KEY (in_printer) REFERENCES custmr_equip (id),
+	FOREIGN KEY (user_updated) REFERENCES users (id),
+	FOREIGN KEY (cartrg_model_id) REFERENCES cartrg_model (id)
+);
+
+
+INSERT INTO cartridges_new (id, serial_num, in_printer, user_updated, time_updated, cartridge_model, curr_status, curr_dept, curr_parcel_track)
+SELECT id, serial_num, in_printer, user_updated, time_updated, cartridge_model, curr_status, curr_dept, curr_parcel_track
+FROM cartridges
+
+
+
+
+
+"""
+
+
+
 # Ініціалізація бази даних і створення початкового користувача
 #with app.app_context():
 #    db.create_all()

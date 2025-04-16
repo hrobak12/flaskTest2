@@ -53,12 +53,22 @@ class CustomerEquipment(db.Model):
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
+class CartridgeModel(db.Model):
+    __tablename__ = 'cartrg_model'
+    id = mapped_column(db.Integer, primary_key=True)
+    model_name = mapped_column(db.String(128), nullable=False, unique=True)
+    model_type = mapped_column(db.Integer, nullable=False)  # 0: Тонер+барабан, 1: Тонер, 2: Барабан, 3: Стрічка, 4: Чорнила
+    printer_model_id = mapped_column(db.Integer, db.ForeignKey('model_print.id'), nullable=True)  # Прив’язка до принтера
+    user_updated = mapped_column(db.Integer, db.ForeignKey('users.id'))
+    time_updated = mapped_column(db.DateTime)
+
 class Cartridges(db.Model):
     __tablename__ = "cartridges"
     id: Mapped[int] = mapped_column(primary_key=True)
     serial_num: Mapped[str] = mapped_column(String(255), server_default="N/A")
     in_printer: Mapped[int] = mapped_column(ForeignKey(CustomerEquipment.id), nullable=True)
     cartridge_model: Mapped[str] = mapped_column(String(255), nullable=True)  # Текстове поле
+    cartrg_model_id: Mapped[int] = mapped_column(ForeignKey(CartridgeModel.id), default=1)
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 # Нове поле. Потрібне щоб зразу знати статус картриджа, а не перебирати таблицю історії
@@ -82,16 +92,6 @@ class CartridgeStatus(db.Model):
         Index('idx_status', 'status'),                                 # Окремий індекс для status
         Index('idx_exec_dept', 'exec_dept'),                           # Окремий індекс для exec_dept
     )
-
-class CartridgeModel(db.Model):
-    __tablename__ = 'cartrg_model'
-    id = mapped_column(db.Integer, primary_key=True)
-    model_name = mapped_column(db.String(128), nullable=False, unique=True)
-    model_type = mapped_column(db.Integer, nullable=False)  # 0: Тонер+барабан, 1: Тонер, 2: Барабан, 3: Стрічка, 4: Чорнила
-    printer_model_id = mapped_column(db.Integer, db.ForeignKey('model_print.id'), nullable=True)  # Прив’язка до принтера
-    user_updated = mapped_column(db.Integer, db.ForeignKey('users.id'))
-    time_updated = mapped_column(db.DateTime)
-
 
 class EventLog(db.Model):
     __tablename__ = "event_log"
