@@ -7,10 +7,12 @@
             <label for="serial_num" class="form-label">Серійний номер</label>
             <input type="text" class="form-control" id="serial_num" name="serial_num" value="{{ cartridge.serial_num }}" required>
         </div>
+
         <div class="mb-3">
             <label for="cartridge_model" class="form-label">Модель картриджа</label>
             <input type="text" class="form-control" id="cartridge_model" name="cartridge_model" value="{{ cartridge.cartridge_model or '' }}">
         </div>
+
         <div class="mb-3">
             <label for="in_printer" class="form-label">У принтері</label>
             <select class="form-select" id="in_printer" name="in_printer">
