@@ -338,6 +338,7 @@ def cartridges():
                            search=search,
                            pagination=pagination)
 
+
 @app.route('/add_cartridge', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -346,13 +347,18 @@ def add_cartridge():
         serial_num = request.form['serial_num']
         if Cartridges.query.filter_by(serial_num=serial_num).first():
             flash('Картридж із таким серійним номером уже існує!')
-            return render_template('add_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, equipments=CustomerEquipment.query.all())
+            return render_template('add_cartridge.html', RefillDept=RefillDept,
+                                                         PrinterModel=PrinterModel,
+                                                         CartridgeModel=CartridgeModel,
+                                                         equipments=CustomerEquipment.query.all())
         in_printer = request.form['in_printer'] or None
-        cartridge_model = request.form['cartridge_model']  # Текстове поле
+        cartridge_model = request.form['cartridge_model'] or None
+        cartrg_model_id = request.form['cartrg_model_id'] or None  # Нове поле
         cartridge = Cartridges(
             serial_num=serial_num,
             in_printer=in_printer,
-            cartridge_model=cartridge_model or None,  # Залишаємо None, якщо порожнє
+            cartridge_model=cartridge_model,
+            cartrg_model_id=cartrg_model_id,  # Додаємо нове поле
             user_updated=current_user.id
         )
         db.session.add(cartridge)
@@ -360,7 +366,10 @@ def add_cartridge():
         flash('Картридж додано!')
         return redirect(url_for('cartridges'))
     equipments = CustomerEquipment.query.all()
-    return render_template('add_cartridge.html', RefillDept=RefillDept, PrinterModel = PrinterModel, equipments=equipments)
+    return render_template('add_cartridge.html', RefillDept=RefillDept,
+                                                 PrinterModel=PrinterModel,
+                                                 CartridgeModel=CartridgeModel,
+                                                 equipments=equipments)
 
 
 @app.route('/edit_cartridge/<int:cartridge_id>', methods=['GET', 'POST'])
@@ -377,12 +386,14 @@ def edit_cartridge(cartridge_id):
                                    RefillDept=RefillDept,
                                    PrinterModel=PrinterModel,
                                    cartridge=cartridge,
+                                   CartridgeModel=CartridgeModel,
                                    equipments=CustomerEquipment.query.all())
 
         # Оновлення даних картриджа
         cartridge.serial_num = serial_num
         cartridge.in_printer = request.form['in_printer'] or None
         cartridge.cartridge_model = request.form['cartridge_model'] or None
+        cartridge.cartrg_model_id = request.form['cartrg_model_id'] or None  # Нове поле
         cartridge.user_updated = current_user.id
         cartridge.time_updated = datetime.now()
 
@@ -407,8 +418,11 @@ def edit_cartridge(cartridge_id):
     return render_template('edit_cartridge.html',
                            RefillDept=RefillDept,
                            PrinterModel=PrinterModel,
+                           CartridgeModel=CartridgeModel,
                            cartridge=cartridge,
                            equipments=equipments)
+
+
 
 @app.route('/delete_cartridge/<int:cartridge_id>', methods=['POST'])
 @login_required
@@ -1819,6 +1833,42 @@ def get_departments():
             for dept in departments
         ]
     })
+
+
+@app.route('/update_cartridge_barcodes', methods=['POST'])
+@login_required
+def update_cartridge_barcodes():
+    data = request.get_json()
+    cartridge_ids = data.get('cartridge_ids', [])
+    barcode = data.get('barcode', '').strip()
+
+    if not cartridge_ids or not barcode:
+        return jsonify({'success': False, 'message': 'Необхідно вказати картриджі та штрих-код'}), 400
+
+    try:
+        for cartridge_id in cartridge_ids:
+            # Оновлюємо parcel_track для останньої події зі статусом 3 у CartridgeStatus
+            latest_status = CartridgeStatus.query.filter_by(cartridge_id=cartridge_id, status=3).order_by(CartridgeStatus.date_ofchange.desc()).first()
+            if latest_status:
+                latest_status.parcel_track = barcode
+                latest_status.time_updated = datetime.now()
+                latest_status.user_updated = current_user.id
+
+            # Оновлюємо curr_parcel_track у таблиці Cartridges
+            cartridge = Cartridges.query.get(cartridge_id)
+            if cartridge:
+                cartridge.curr_parcel_track = barcode
+            else:
+                # Якщо картридж не знайдено, логувати помилку, але не переривати цикл
+                current_app.logger.error(f"Картридж з ID {cartridge_id} не знайдено в таблиці Cartridges")
+
+        db.session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

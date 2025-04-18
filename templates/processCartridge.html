@@ -61,9 +61,7 @@
         </div>
     </div>
 
-
-
-<!-- Модальне вікно для історії дій -->
+    <!-- Модальне вікно для історії дій -->
     <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -95,75 +93,123 @@
         </div>
     </div>
 
-<!-- Модальне вікно для друку адресного ярлика -->
-<div class="modal fade" id="printLabelModal" tabindex="-1" aria-labelledby="printLabelModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-secondary text-white">
-                <h5 class="modal-title" id="printLabelModalLabel">Друкувати адресний ярлик</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="receiver_dept" class="form-label">Виберіть відділ одержувач</label>
-                    <select class="form-select" id="receiver_dept" name="receiver_dept" required>
-                        <option value="">Не вказано</option>
-                        {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
-                            <option value="{{ dept.id }}">{{ dept.deptname }}</option>
-                        {% endfor %}
-                    </select>
+    <!-- Модальне вікно для друку адресного ярлика -->
+    <div class="modal fade" id="printLabelModal" tabindex="-1" aria-labelledby="printLabelModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="printLabelModalLabel">Друкувати адресний ярлик</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="receiver_dept" class="form-label">Виберіть відділ одержувач</label>
+                        <select class="form-select" id="receiver_dept" name="receiver_dept" required>
+                            <option value="">Не вказано</option>
+                            {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
+                                <option value="{{ dept.id }}">{{ dept.deptname }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ukrposhta" id="printLabelConfirmBtn">Друкувати</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-ukrposhta" id="printLabelConfirmBtn">Друкувати</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+        </div>
+    </div>
+
+    <!-- Модальне вікно для введення штрих-коду -->
+    <div class="modal fade" id="barcodeModal" tabindex="-1" aria-labelledby="barcodeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="barcodeModalLabel">Вказати штрих-код для картриджів</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="barcodeForm">
+                        <div class="mb-3">
+                            <label for="barcode" class="form-label">Штрих-код</label>
+                            <input type="text" class="form-control" id="barcode" name="barcode" maxlength="13" placeholder="Введіть штрих-код" required autofocus>
+                        </div>
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-secondary" id="toggleSelectAll">Вибрати всі</button>
+                        </div>
+                        <div class="card">
+                            <div class="card-body p-0">
+                                <div style="max-height: 300px; overflow-y: auto;">
+                                    <table class="table table-striped mb-0" id="barcode-table">
+                                        <thead class="sticky-header">
+                                            <tr>
+                                                <th class="col-select">Вибрати</th>
+                                                <th class="col-serial">Серійний номер</th>
+                                                <th class="col-model">Модель картриджа</th>
+                                                <th class="col-date">Дата відправки</th>
+                                                <th class="col-dept">Відділ (куди)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="barcode-table-body">
+                                            <!-- Дані завантажуються через JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="no-cartridges-message" class="alert alert-info mt-3 d-none" role="alert">
+                            Немає картриджів без штрих-коду для присвоєння.
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                    <button type="button" class="btn btn-primary" id="confirmBarcode">Вказати</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-
-<!-- Таблиця картриджів "В дорозі" -->
-<div class="mt-5">
-    <div class="d-flex justify-content-between align-items-center">
-        <h3>Картриджі в дорозі</h3>
-        <div class="d-flex gap-2"> <!-- Вирівнюємо кнопки в ряд із відступом -->
-            <!-- Кнопка "Адреса" з випадаючим меню -->
-            <div class="dropdown">
-                <button class="btn btn-ukrposhta dropdown-toggle" type="button" id="addressDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    Адреса
-                </button>
-                <ul class="dropdown-menu" aria-labelledby="addressDropdown">
-                    <li><a class="dropdown-item" href="#" onclick="printLabelModal.show(); return false;">Друкувати ярлик</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="alert('Ця функція ще не реалізована'); return false;">Вказати штрих-код</a></li>
-                </ul>
-            </div>
-            <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
-        </div>
-    </div>
-    <div class="card">
-        <div class="card-body p-0">
-            <div style="max-height: 300px; overflow-y: auto;">
-                <table class="table table-striped mb-0" id="in-transit-table">
-                    <thead class="sticky-header">
-                        <tr>
-                            <th class="col-id">ID</th>
-                            <th class="col-serial">Серійний номер</th>
-                            <th class="col-model">Модель картриджа</th>
-                            <th class="col-date">Дата відправки</th>
-                            <th class="col-dept">Відділ (куди)</th>
-                            <th class="col-track">Трек-номер</th>
-                        </tr>
-                    </thead>
-                    <tbody id="in-transit-table-body">
-                        <!-- Дані завантажуються через JS -->
-                    </tbody>
-                </table>
+    <!-- Таблиця картриджів "В дорозі" -->
+    <div class="mt-5">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>Картриджі в дорозі</h3>
+            <div class="d-flex gap-2">
+                <!-- Кнопка "Адреса" з випадаючим меню -->
+                <div class="dropdown">
+                    <button class="btn btn-ukrposhta dropdown-toggle" type="button" id="addressDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        Адреса
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="addressDropdown">
+                        <li><a class="dropdown-item" href="#" onclick="printLabelModal.show(); return false;">Друкувати ярлик</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="barcodeModal.show(); return false;">Вказати штрих-код</a></li>
+                    </ul>
+                </div>
+                <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
             </div>
         </div>
+        <div class="card">
+            <div class="card-body p-0">
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-striped mb-0" id="in-transit-table">
+                        <thead class="sticky-header">
+                            <tr>
+                                <th class="col-id">ID</th>
+                                <th class="col-serial">Серійний номер</th>
+                                <th class="col-model">Модель картриджа</th>
+                                <th class="col-date">Дата відправки</th>
+                                <th class="col-dept">Відділ (куди)</th>
+                                <th class="col-track">Трек-номер</th>
+                            </tr>
+                        </thead>
+                        <tbody id="in-transit-table-body">
+                            <!-- Дані завантажуються через JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-
 
     <!-- Таблиця картриджів "На зберіганні" -->
     <div class="mt-4">
@@ -182,7 +228,7 @@
                                 <th class="col-model">Модель картриджа</th>
                                 <th class="col-date">Дата обробки</th>
                                 <th class="col-dept">Відділ</th>
-                                <th class="col-status">Статус</th> <!-- Замінено Трек-номер на Статус -->
+                                <th class="col-status">Статус</th>
                             </tr>
                         </thead>
                         <tbody id="in-storage-table-body">
@@ -195,93 +241,83 @@
     </div>
 
     <!-- Додаємо стилі -->
-<style>
-    .sticky-header {
-        position: sticky;
-        top: 0;
-        background-color: #f8f9fa;
-        z-index: 1;
-    }
-    .sticky-header th {
-        border-bottom: 2px solid #dee2e6;
-    }
-    .col-id { width: 5%; }
-    .col-serial { width: 20%; }
-    .col-model { width: 20%; }
-    .col-date { width: 15%; }
-    .col-dept { width: 20%; }
-    .col-track { width: 20%; }
-    .col-status { width: 20%; } /* Додано */
-    .serial-link {
-        color: #007bff;
-        text-decoration: underline;
-        cursor: pointer;
-    }
-    .serial-link:hover {
-        color: #0056b3;
-    }
-    .process-link {
-        color: #007bff;
-        text-decoration: underline;
-        cursor: pointer;
-    }
-    .process-link:hover {
-        color: #0056b3;
-    }
-    .btn-excel {
-        background-color: #1D6F42;
-        color: white;
-        border: none;
-    }
-    .btn-excel2 {
-        background-color: #F40F02;
-        color: white;
-        border: none;
-    }
-    .btn-excel:hover {
-        background-color: #155932;
-        color: white;
-    }
-
-    .btn-acrobat {
-        background-color: #E40F02; /* Червоний колір Acrobat */
-        border-color: #E40F02;
-        color: white; /* Білий текст для контрасту */
-    }
-    .btn-acrobat:hover {
-        background-color: #d30d02; /* Темніший червоний при наведенні */
-        border-color: #d30d02;
-        color: white;
-    }
-
-    .btn-ukrposhta {
-        background-color: #FFC107;
-        color: #000; /* Чорний текст для контрасту */
-    }
-
-    .btn-ukrposhta:hover {
-        background-color: #FFB300; /* Трохи темніший відтінок для ефекту наведення */
-    }
-
-    /* Зберігаємо колір при відкритому меню */
-    .btn-ukrposhta.dropdown-toggle.show {
-        background-color: #FFB300 !important; /* Колір як при :hover */
-        color: #000 !important;
-
-    .serial-suggestions.show {
-        display: block;
-    }
-    .serial-suggestions {
-        word-break: break-word; /* Переносить довгі слова на новий рядок */
-        white-space: normal;   /* Дозволяє перенос тексту */
-        overflow-x: hidden;    /* Ховає горизонтальну прокрутку */
-    }
-    .serial-suggestions .dropdown-item {
-        white-space: normal;   /* Дозволяє перенос тексту в пунктах */
-        overflow-x: hidden;    /* Ховає горизонтальну прокрутку в пунктах */
-    }
-
-</style>
+    <style>
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 1;
+        }
+        .sticky-header th {
+            border-bottom: 2px solid #dee2e6;
+        }
+        .col-id { width: 5%; }
+        .col-serial { width: 25%; }
+        .col-model { width: 25%; }
+        .col-date { width: 20%; }
+        .col-dept { width: 22%; }
+        .col-track { width: 20%; }
+        .col-status { width: 20%; }
+        .col-select { width: 8%; }
+        .serial-link {
+            color: #007bff;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .serial-link:hover {
+            color: #0056b3;
+        }
+        .process-link {
+            color: #007bff;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .process-link:hover {
+            color: #0056b3;
+        }
+        .btn-excel {
+            background-color: #1D6F42;
+            color: white;
+            border: none;
+        }
+        .btn-excel:hover {
+            background-color: #155932;
+            color: white;
+        }
+        .btn-ukrposhta {
+            background-color: #FFC107;
+            color: #000;
+        }
+        .btn-ukrposhta:hover {
+            background-color: #FFB300;
+        }
+        .btn-ukrposhta.dropdown-toggle.show {
+            background-color: #FFB300 !important;
+            color: #000 !important;
+        }
+        .serial-suggestions.show {
+            display: block;
+        }
+        .serial-suggestions {
+            word-break: break-word;
+            white-space: normal;
+            overflow-x: hidden;
+        }
+        .serial-suggestions .dropdown-item {
+            white-space: normal;
+            overflow-x: hidden;
+        }
+        .double-blink {
+            animation: double-blink 0.4s step-end 2;
+        }
+        @keyframes double-blink {
+            0%, 50% { color: red; }
+            25%, 75%, 100% { color: inherit; }
+        }
+        .table td, .table th {
+            padding: 0.5rem;
+        }
+    </style>
 {% endblock %}
 
 {% block scripts %}
@@ -296,6 +332,11 @@
         const execDeptSelect = document.getElementById('exec_dept');
         const printerSelect = document.getElementById('printer');
         const statusSelect = document.getElementById('status');
+        const barcodeModal = new bootstrap.Modal(document.getElementById('barcodeModal'));
+        const barcodeInput = document.getElementById('barcode');
+        const barcodeTableBody = document.getElementById('barcode-table-body');
+        const noCartridgesMessage = document.getElementById('no-cartridges-message');
+        const toggleSelectAllBtn = document.getElementById('toggleSelectAll');
 
         let selectedIndex = -1;
 
@@ -463,7 +504,6 @@
             printerSelect.disabled = true;
         });
 
-//******************************** таблиця картриджів, які в дорозі*************************
         // Завантаження картриджів "В дорозі"
         function fetchInTransitCartridges() {
             fetch('/api/in_transit_cartridges', {
@@ -490,9 +530,7 @@
                 `;
                 tbody.appendChild(row);
             });
-                }
-
-//******************************** таблиця картриджів, які в дорозі*************************
+        }
 
         // Завантаження картриджів "На зберіганні"
         function fetchInStorageCartridges() {
@@ -597,67 +635,6 @@
             .catch(error => alert('Помилка при відправці: ' + error));
         }
 
-        // Завантаження картриджів "В дорозі"
-        function fetchInTransitCartridges() {
-            fetch('/api/in_transit_cartridges', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => response.json())
-            .then(data => updateInTransitTable(data.cartridges))
-            .catch(error => console.error('Помилка:', error));
-        }
-
-        function updateInTransitTable(cartridges) {
-            const tbody = document.getElementById('in-transit-table-body');
-            tbody.innerHTML = '';
-            cartridges.forEach(cartridge => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${cartridge.id}</td>
-                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
-                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
-                    <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
-                    <td>${cartridge.dept_name || 'Не вказано'}</td>
-                    <td>${cartridge.parcel_track || 'Не вказано'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // Завантаження картриджів "На зберіганні"
-        function fetchInStorageCartridges() {
-            fetch('/api/in_storage_cartridges', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => response.json())
-            .then(data => updateInStorageTable(data.cartridges))
-            .catch(error => console.error('Помилка:', error));
-        }
-
-        function updateInStorageTable(cartridges) {
-            const tbody = document.getElementById('in-storage-table-body');
-            tbody.innerHTML = '';
-            const statusMap = {
-                1: 'На зберіганні (порожній)',
-                6: 'На зберіганні (заправлений)'
-            };
-            cartridges.forEach(cartridge => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${cartridge.id}</td>
-                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
-                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
-                    <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
-                    <td>${cartridge.dept_name || 'Не вказано'}</td>
-                    <td>${statusMap[cartridge.status] || 'Невідомий'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-
         // Показ історії
         function showHistory(cartridgeId) {
             fetch(`/api/cartridge_history/${cartridgeId}`, {
@@ -709,6 +686,109 @@
                 printLabelModal.hide();
             } else {
                 alert('Будь ласка, виберіть відділ одержувач');
+            }
+        });
+
+        // Завантаження картриджів для модального вікна штрих-коду
+        document.getElementById('barcodeModal').addEventListener('shown.bs.modal', () => {
+            fetch('/api/in_transit_cartridges', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => updateBarcodeTable(data.cartridges))
+            .catch(error => {
+                console.error('Помилка:', error);
+                noCartridgesMessage.classList.remove('d-none');
+                barcodeTableBody.innerHTML = '';
+            });
+            barcodeInput.focus();
+        });
+
+        // Очищення форми при закритті модального вікна штрих-коду
+        document.getElementById('barcodeModal').addEventListener('hidden.bs.modal', () => {
+            barcodeInput.value = '';
+            barcodeTableBody.innerHTML = '';
+            noCartridgesMessage.classList.add('d-none');
+            toggleSelectAllBtn.textContent = 'Вибрати всі';
+        });
+
+        // Оновлення таблиці в модальному вікні штрих-коду
+        function updateBarcodeTable(cartridges) {
+            barcodeTableBody.innerHTML = '';
+            // Фільтруємо картриджі, у яких parcel_track не встановлено
+            const filteredCartridges = cartridges.filter(cartridge => !cartridge.parcel_track);
+            if (filteredCartridges.length === 0) {
+                noCartridgesMessage.classList.remove('d-none');
+                return;
+            }
+            noCartridgesMessage.classList.add('d-none');
+            filteredCartridges.forEach(cartridge => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="checkbox" class="form-check-input cartridge-select" data-cartridge-id="${cartridge.id}" checked></td>
+                    <td>${cartridge.serial_num}</td>
+                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
+                    <td>${new Date(cartridge.date_ofchange).toLocaleString()}</td>
+                    <td>${cartridge.dept_name || 'Не вказано'}</td>
+                `;
+                barcodeTableBody.appendChild(row);
+            });
+        }
+
+        // Обробка кнопки "Вибрати всі/Зняти всі"
+        toggleSelectAllBtn.addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.cartridge-select');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            toggleSelectAllBtn.textContent = allChecked ? 'Вибрати всі' : 'Зняти всі';
+        });
+
+        // Обробка натискання Enter у полі штрих-коду
+        barcodeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('confirmBarcode').click();
+            }
+        });
+
+        // Обробка кнопки "Вказати" для штрих-коду
+        document.getElementById('confirmBarcode').addEventListener('click', () => {
+            const barcode = barcodeInput.value.trim();
+            if (!barcode) {
+                alert('Будь ласка, введіть штрих-код!');
+                barcodeInput.focus();
+                return;
+            }
+
+            const selectedCartridges = Array.from(document.querySelectorAll('.cartridge-select:checked'))
+                .map(checkbox => parseInt(checkbox.dataset.cartridgeId));
+
+            if (selectedCartridges.length === 0) {
+                alert('Будь ласка, виберіть хоча б один картридж!');
+                return;
+            }
+
+            if (confirm('Ви впевнені, що хочете присвоїти штрих-код для вибраних картриджів?')) {
+                fetch('/update_cartridge_barcodes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cartridge_ids: selectedCartridges,
+                        barcode: barcode
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Штрих-код успішно присвоєно!');
+                        barcodeModal.hide();
+                        fetchInTransitCartridges();
+                    } else {
+                        alert('Помилка: ' + data.message);
+                    }
+                })
+                .catch(error => alert('Помилка при відправці: ' + error));
             }
         });
     </script>

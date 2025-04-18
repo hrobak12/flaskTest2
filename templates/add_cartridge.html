@@ -11,6 +11,19 @@
             <label for="cartridge_model" class="form-label">Модель картриджа</label>
             <input type="text" class="form-control" id="cartridge_model" name="cartridge_model">
         </div>
+        <!-- Нове поле: Модель картриджа (нове, тест) -->
+        <div class="mb-3">
+            <label for="cartrg_model_id" class="form-label">Модель картриджа (нове, тест)</label>
+            <select class="form-select" id="cartrg_model_id" name="cartrg_model_id">
+                <option value="">Не вибрано</option>
+                {% for cartrg_model in CartridgeModel.query.all() %}
+                    {% set printer_model = PrinterModel.query.get(cartrg_model.printer_model_id) %}
+                    <option value="{{ cartrg_model.id }}">
+                        {{ cartrg_model.model_name }} {% if printer_model %}({{ printer_model.model_name }}){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="mb-3">
             <label for="in_printer" class="form-label">У принтері</label>
             <select class="form-select" id="in_printer" name="in_printer">
