@@ -1,7 +1,7 @@
 import os, secrets
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, Response, send_file
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, asc, desc
 # from sqlalchemy.sql import text  # Додаємо імпорт text
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel
@@ -17,6 +17,7 @@ from barcode import Code128
 from barcode.writer import ImageWriter
 from transliterate import translit
 
+from config import status_map
 
 app = Flask(__name__)
 # Тільки для розробки
@@ -434,31 +435,6 @@ def delete_cartridge(cartridge_id):
     flash('Картридж видалено!')
     return redirect(url_for('cartridges'))
 
-#deprecated. застаріле.
-#@app.route('/send_to_refill/<int:cartridge_id>', methods=['POST'])
-#@login_required
-#def send_to_refill(cartridge_id):
-#    cartridge = Cartridges.query.get_or_404(cartridge_id)
-#    exec_dept_id = request.form['exec_dept_id']
-#    parcel_track = request.form.get('parcel_track', '')
-#    status = CartridgeStatus(
-#        status=1,  # "refill is pending"
-#        exec_dept=exec_dept_id,
-#        parcel_track=parcel_track,
-#        user_updated=current_user.id
-#    )
-#    cartridge.in_printer = None
-#    event = EventLog(
-#        table_name='cartridges',
-#        event_type=1,  # Зміна статусу
-#        user_updated=current_user.id
-#    )
-#    db.session.add(status)
-#    db.session.add(event)
-#    db.session.commit()
-#    flash('Картридж відправлено на заправку!')
-#    return redirect(url_for('cartridges'))
-
 # Відображення подій обробки картриджів та керування ними
 # Основний маршрут для відображення подій
 @app.route('/cartridge_status')
@@ -865,28 +841,77 @@ def printers_by_dept(dept_id):
     return jsonify({'printers': printers_data})
 
 #тестовий ендпоінт для фільтрації статусу картриджів
-@app.route('/api/cartridges_by_status/<int:cartridge_status>', methods=['GET'])
+#@app.route('/api/cartridges_by_status/<int:cartridge_status>', methods=['GET'])
+#@login_required
+#def api_cartridges_by_status(cartridge_status):
+#    # Запит до Cartridges із фільтром по curr_status (1 або 6) і приєднанням RefillDept
+#    in_storage_query = db.session.query(Cartridges, RefillDept.deptname)\
+#                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
+#                                 .filter(Cartridges.curr_status == cartridge_status) \
+#                                 .order_by(Cartridges.cartridge_model.asc())
+#
+#    cartridges_data = []
+#    for cartridge, dept_name in in_storage_query.all():
+#        cartridges_data.append({
+#            'id': cartridge.id,
+#            'serial_num': cartridge.serial_num,
+#            'cartridge_model': cartridge.cartridge_model,
+#            'status': cartridge.curr_status,  # Беремо curr_status із Cartridges
+#            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,  # Використовуємо time_updated
+#            'dept_name': dept_name or 'Не вказано'
+#        })
+#    return jsonify({'cartridges': cartridges_data})
+
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-
+#на заміну in_transit_cartridges та in_storage_cartridges
+@app.route('/api/cartridges_by_status', methods=['GET'])
 @login_required
-def api_cartridges_by_status(cartridge_status):
-    # Запит до Cartridges із фільтром по curr_status (1 або 6) і приєднанням RefillDept
-    in_storage_query = db.session.query(Cartridges, RefillDept.deptname)\
-                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
-                                 .filter(Cartridges.curr_status == cartridge_status) \
-                                 .order_by(Cartridges.cartridge_model.asc())
+def api_cartridges_by_status():
+    # Отримуємо параметри з запиту
+    status_list_str = request.args.get('status_list')
+    status_sort = request.args.get('status_sort', 'asc').lower()
+
+    # Перевірка status_list
+    if not status_list_str:
+        return jsonify({'error': 'status_list parameter is required'}), 400
+
+    try:
+        # Конвертуємо status_list із рядка (наприклад, "1,5,6") у список цілих чисел
+        status_list = [int(s) for s in status_list_str.split(',') if s.strip()]
+        if not status_list:
+            return jsonify({'error': 'status_list cannot be empty'}), 400
+    except ValueError:
+        return jsonify({'error': 'status_list must contain valid integers'}), 400
+
+    # Перевірка status_sort
+    if status_sort not in ['asc', 'desc']:
+        return jsonify({'error': 'status_sort must be "asc" or "desc"'}), 400
+    sort_func = asc if status_sort == 'asc' else desc
+
+    # Запит до Cartridges із фільтром по curr_status і приєднанням RefillDept та CartridgeModel
+    query = db.session.query(Cartridges, RefillDept.deptname, CartridgeModel.model_name)\
+                     .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
+                     .outerjoin(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)\
+                     .filter(Cartridges.curr_status.in_(status_list))\
+                     .order_by(sort_func(Cartridges.time_updated))
 
     cartridges_data = []
-    for cartridge, dept_name in in_storage_query.all():
+    for cartridge, dept_name, model_name in query.all():
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model,
-            'status': cartridge.curr_status,  # Беремо curr_status із Cartridges
-            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,  # Використовуємо time_updated
-            'dept_name': dept_name or 'Не вказано'
+            'cartridge_model': model_name or 'Не вказано',  # Використовуємо CartridgeModel.model_name
+            'status': cartridge.curr_status,  # Залишаємо числовий статус
+            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,
+            'dept_name': dept_name or 'Не вказано',
+            'parcel_track': cartridge.curr_parcel_track or 'Не вказано'
         })
+
     return jsonify({'cartridges': cartridges_data})
 
-
+"""
+#DEPRECATED. Застаріле, до видалення.
 
 @app.route('/api/in_transit_cartridges', methods=['GET'])
 @login_required
@@ -933,7 +958,8 @@ def api_in_storage_cartridges():
             'dept_name': dept_name or 'Не вказано'
         })
     return jsonify({'cartridges': cartridges_data})
-
+#
+"""
 
 #маршрут для отримання історії дій картриджа:
 @app.route('/api/cartridge_history/<int:cartridge_id>', methods=['GET'])
@@ -1199,15 +1225,15 @@ def export_cartridge_history(cartridge_id):
     ws.title = f"Історія_{serial_num}"
     headers = ["Дата", "Статус", "Відділ", "Трек-номер", "Оновлено користувачем"]
     ws.append(headers)
-    status_map = {
-        0: 'Не вказано',
-        1: 'На зберіганні (порожній)',
-        2: 'Відправлено в користування',
-        3: 'Відправлено на заправку',
-        4: 'Непридатний (списаний)',
-        5: 'Одноразовий (фарба у банці)',
-        6: 'На зберіганні (заправлений)'
-    }
+#    status_map = {
+#        0: 'Не вказано',
+#        1: 'На зберіганні (порожній)',
+#        2: 'Відправлено в користування',
+#        3: 'Відправлено на заправку',
+#       4: 'Непридатний (списаний)',
+#        5: 'Одноразовий (фарба у банці)',
+#        6: 'На зберіганні (заправлений)'
+#    }
     for event in history_data:
         ws.append([event['date_ofchange'], status_map.get(event['status'], 'Невідомий'),
                    event['dept_name'], event['parcel_track'], event['user_login']])
@@ -1259,15 +1285,15 @@ def export_cartridge_events():
     ws.title = "Події обробки картриджів"
     headers = ["ID", "Картридж", "Статус", "Дата зміни", "Трек-номер", "Відділ"]
     ws.append(headers)
-    status_map = {
-        0: 'Не вказано',
-        1: 'На зберіганні (порожній)',
-        2: 'Відправлено в користування',
-        3: 'Відправлено на заправку',
-        4: 'Непридатний (списаний)',
-        5: 'Одноразовий (фарба у банці)',
-        6: 'На зберіганні (заправлений)'
-    }
+#    status_map = {
+#        0: 'Не вказано',
+#        1: 'На зберіганні (порожній)',
+#        2: 'Відправлено в користування',
+#        3: 'Відправлено на заправку',
+#        4: 'Непридатний (списаний)',
+#        5: 'Одноразовий (фарба у банці)',
+#        6: 'На зберіганні (заправлений)'
+#    }
     for status, serial_num, deptname in statuses:
         ws.append([status.id, serial_num, status_map.get(status.status, 'Невідомий'),
                    status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
@@ -1487,15 +1513,15 @@ def api_report_period():
 
     # Виконуємо запит і формуємо дані
     report_data = []
-    status_map = {
-        0: 'Не вказано',
-        1: 'На зберіганні (порожній)',
-        2: 'Відправлено в користування',
-        3: 'Відправлено на заправку',
-        4: 'Непридатний (списаний)',
-        5: 'Одноразовий (фарба у банці)',
-        6: 'На зберіганні (заправлений)'
-    }
+#    status_map = {
+#        0: 'Не вказано',
+#        1: 'На зберіганні (порожній)',
+#        2: 'Відправлено в користування',
+#        3: 'Відправлено на заправку',
+#        4: 'Непридатний (списаний)',
+#        5: 'Одноразовий (фарба у банці)',
+#        6: 'На зберіганні (заправлений)'
+#    }
     for status, cartridge, dept_name, username in query.order_by(CartridgeStatus.date_ofchange.desc()).all():
         report_data.append({
             'id': cartridge.id,
@@ -1508,67 +1534,6 @@ def api_report_period():
         })
 
     return jsonify({'report': report_data})
-
-"""
-# Хоч і нова функція, але поки що відключаю
-# API для отримання даних звіту
-@app.route('/api/report_period', methods=['GET'])
-@login_required
-def api_report_period():
-    start_date_str = request.args.get('start_date')
-    end_date_str = request.args.get('end_date')
-
-    # Перетворюємо рядки дат у об'єкти datetime
-    try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-    except (ValueError, TypeError):
-        return jsonify({'error': 'Неправильний формат дати. Використовуйте YYYY-MM-DD'}), 400
-
-    # Субзапит для отримання найсвіжішої події для кожного картриджа
-    latest_status_subquery = db.session.query(CartridgeStatus.cartridge_id, func.max(CartridgeStatus.date_ofchange).label('max_date'))\
-        .filter(CartridgeStatus.date_ofchange.between(start_date, end_date))\
-        .group_by(CartridgeStatus.cartridge_id).subquery()
-
-    # Основний запит із приєднанням до субзапиту
-    query = db.session.query(CartridgeStatus, Cartridges, RefillDept.deptname, User.username)\
-        .join(latest_status_subquery, (CartridgeStatus.cartridge_id == latest_status_subquery.c.cartridge_id) &
-              (CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
-        .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)\
-        .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
-        .join(User, CartridgeStatus.user_updated == User.id)
-
-    # Фільтр для не-адмінів
-    if current_user.role != 'admin':
-        query = query.filter(CartridgeStatus.user_updated == current_user.id)
-
-    # Сортування за датою (найсвіжіші зверху)
-    query = query.order_by(CartridgeStatus.date_ofchange.desc())
-
-    # Формуємо дані
-    report_data = []
-    status_map = {
-        0: 'Не вказано',
-        1: 'На зберіганні (порожній)',
-        2: 'Відправлено в користування',
-        3: 'Відправлено на заправку',
-        4: 'Непридатний (списаний)',
-        5: 'Одноразовий (фарба у банці)',
-        6: 'На зберіганні (заправлений)'
-    }
-    for status, cartridge, dept_name, username in query.all():
-        report_data.append({
-            'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
-            'status': status_map[status.status],
-            'date_ofchange': status.date_ofchange.isoformat(),
-            'dept_name': dept_name or 'Не вказано',
-            'user_login': username or 'Не вказано'
-        })
-
-    return jsonify({'report': report_data})
-"""
-#******************************************************
 
 
 @app.route('/export/report_period', methods=['GET'])
@@ -1593,15 +1558,17 @@ def export_report_period():
         query = query.filter(CartridgeStatus.user_updated == current_user.id)
 
     report_data = []
-    status_map = {
-        0: 'Не вказано',
-        1: 'На зберіганні (порожній)',
-        2: 'Відправлено в користування',
-        3: 'Відправлено на заправку',
-        4: 'Непридатний (списаний)',
-        5: 'Одноразовий (фарба у банці)',
-        6: 'На зберіганні (заправлений)'
-    }
+
+#    status_map = {
+#        0: 'Не вказано',
+#        1: 'На зберіганні (порожній)',
+#        2: 'Відправлено в користування',
+#        3: 'Відправлено на заправку',
+#        4: 'Непридатний (списаний)',
+#        5: 'Одноразовий (фарба у банці)',
+#        6: 'На зберіганні (заправлений)'
+#    }
+
     for status, cartridge, dept_name, username in query.order_by(CartridgeStatus.date_ofchange.asc()).all():
         report_data.append([
             cartridge.id,

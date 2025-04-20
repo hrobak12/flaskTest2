@@ -506,13 +506,23 @@
 
         // Завантаження картриджів "В дорозі"
         function fetchInTransitCartridges() {
-            fetch('/api/in_transit_cartridges', {
+            fetch('/api/cartridges_by_status?status_list=3&status_sort=asc', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || `HTTP error! Status: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
             .then(data => updateInTransitTable(data.cartridges))
-            .catch(error => console.error('Помилка:', error));
+            .catch(error => {
+                console.error('Помилка завантаження картриджів:', error);
+                alert(`Помилка: ${error.message}`);
+            });
         }
 
         function updateInTransitTable(cartridges) {
@@ -534,13 +544,18 @@
 
         // Завантаження картриджів "На зберіганні"
         function fetchInStorageCartridges() {
-            fetch('/api/in_storage_cartridges', {
+            fetch('/api/cartridges_by_status?status_list=1,6&status_sort=desc', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => updateInStorageTable(data.cartridges))
-            .catch(error => console.error('Помилка:', error));
+            .catch(error => console.error('Помилка завантаження картриджів:', error));
         }
 
         function updateInStorageTable(cartridges) {
