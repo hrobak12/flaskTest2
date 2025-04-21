@@ -903,7 +903,8 @@ def api_cartridges_by_status():
             'serial_num': cartridge.serial_num,
             'cartridge_model': model_name or 'Не вказано',  # Використовуємо CartridgeModel.model_name
             'status': cartridge.curr_status,  # Залишаємо числовий статус
-            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,
+#            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,
+            'date_ofchange': cartridge.time_updated.strftime('%Y-%m-%d') if cartridge.time_updated else None,
             'dept_name': dept_name or 'Не вказано',
             'parcel_track': cartridge.curr_parcel_track or 'Не вказано'
         })
@@ -1835,6 +1836,11 @@ def update_cartridge_barcodes():
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+
+@app.route('/testCartridge', methods=['GET'])
+@login_required
+def test_cartridges():
+    return render_template('testCartridge.html', RefillDept=RefillDept)
 
 
 if __name__ == '__main__':
