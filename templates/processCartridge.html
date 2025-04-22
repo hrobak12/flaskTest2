@@ -1,838 +1,942 @@
 {% extends "base.html" %}
 {% block title %}Обробка картриджів{% endblock %}
 {% block content %}
-   <h1>Обробка картриджів</h1>
-   <h2><a href="#" class="process-link" onclick="processModal.show(); return false;">Натисніть сюди</a> або F2 для обробки картриджів</h2>
+<h1>Обробка картриджів</h1>
+<h2><a href="#" class="process-link" onclick="processModal.show(); return false;">Натисніть сюди</a> або F2 для обробки картриджів</h2>
 
-    <!-- Модальне вікно для обробки -->
-    <div class="modal fade" id="processModal" tabindex="-1" aria-labelledby="processModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title" id="processModalLabel">Приймання або відправка картриджа</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="processForm">
-                        <div class="mb-3 position-relative">
-                            <label for="serial_num" class="form-label">Серійний номер</label>
-                            <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Введіть або відскануйте" required autofocus>
-                            <div id="serial-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="status" class="form-label">Статус</label>
-                            <select class="form-select" id="status" name="status" required>
-                                <option value="0">Не вказано</option>
-                                <option value="1">На зберіганні (порожній)</option>
-                                <option value="2">Відправлено в користування</option>
-                                <option value="3">Відправлено на заправку</option>
-                                <option value="4">Непридатний (списаний)</option>
-                                <option value="5">Одноразовий (фарба у банці)</option>
-                                <option value="6">На зберіганні (заправлений)</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="exec_dept" class="form-label">Відділ</label>
-                            <select class="form-select" id="exec_dept" name="exec_dept" required>
-                                <option value="">Виберіть відділ</option>
-                                {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
-                                    <option value="{{ dept.id }}">{{ dept.deptname }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="printer" class="form-label">Принтер</label>
-                            <select class="form-select" id="printer" name="printer" disabled>
-                                <option value="">Спочатку виберіть відділ</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="parcel_track" class="form-label">Трек-номер (необов’язково)</label>
-                            <input type="text" class="form-control" id="parcel_track" name="parcel_track" maxlength="13" placeholder="Трек-номер">
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-ukrposhta me-auto" id="printLabelBtn">Друкувати ярлик</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
-                    <button type="button" class="btn btn-primary" id="confirmProcess">Підтвердити</button>
-                </div>
+<!-- Модальне вікно для обробки -->
+<div class="modal fade" id="processModal" tabindex="-1" aria-labelledby="processModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="processModalLabel">Приймання або відправка картриджа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        </div>
-    </div>
-
-    <!-- Модальне вікно для історії дій -->
-    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title" id="historyModalLabel">Історія дій для картриджа</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Дата</th>
-                                <th>Статус</th>
-                                <th>Відділ</th>
-                                <th>Трек-номер</th>
-                                <th>Оновлено користувачем</th>
-                            </tr>
-                        </thead>
-                        <tbody id="history-table-body">
-                            <!-- Дані завантажуються через JS -->
-                        </tbody>
-                    </table>
-                </div>
-                <div class="modal-footer">
-                    <a href="#" id="exportHistoryBtn" class="btn btn-excel">Звіт</a>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальне вікно для друку адресного ярлика -->
-    <div class="modal fade" id="printLabelModal" tabindex="-1" aria-labelledby="printLabelModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title" id="printLabelModalLabel">Друкувати адресний ярлик</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
+            <div class="modal-body">
+                <form id="processForm">
+                    <div class="mb-3 position-relative">
+                        <label for="serial_num" class="form-label">Серійний номер</label>
+                        <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Введіть або відскануйте" required autofocus>
+                        <div id="serial-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
+                    </div>
                     <div class="mb-3">
-                        <label for="receiver_dept" class="form-label">Виберіть відділ одержувач</label>
-                        <select class="form-select" id="receiver_dept" name="receiver_dept" required>
-                            <option value="">Не вказано</option>
+                        <label for="status" class="form-label">Статус</label>
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="0">Не вказано</option>
+                            <option value="1">На зберіганні (порожній)</option>
+                            <option value="2">Відправлено в користування</option>
+                            <option value="3">Відправлено на заправку</option>
+                            <option value="4">Непридатний (списаний)</option>
+                            <option value="5">Одноразовий (фарба у банці)</option>
+                            <option value="6">На зберіганні (заправлений)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="exec_dept" class="form-label">Відділ</label>
+                        <select class="form-select" id="exec_dept" name="exec_dept" required>
+                            <option value="">Виберіть відділ</option>
                             {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
                                 <option value="{{ dept.id }}">{{ dept.deptname }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-ukrposhta" id="printLabelConfirmBtn">Друкувати</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
-                </div>
+                    <div class="mb-3">
+                        <label for="printer" class="form-label">Принтер</label>
+                        <select class="form-select" id="printer" name="printer" disabled>
+                            <option value="">Спочатку виберіть відділ</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="parcel_track" class="form-label">Трек-номер (необов’язково)</label>
+                        <input type="text" class="form-control" id="parcel_track" name="parcel_track" maxlength="13" placeholder="Трек-номер">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ukrposhta me-auto" id="printLabelBtn">Друкувати ярлик</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="button" class="btn btn-primary" id="confirmProcess">Підтвердити</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Модальне вікно для введення штрих-коду -->
-    <div class="modal fade" id="barcodeModal" tabindex="-1" aria-labelledby="barcodeModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title" id="barcodeModalLabel">Вказати штрих-код для картриджів</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- Модальне вікно для історії дій -->
+<div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="historyModalLabel">Історія дій для картриджа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Статус</th>
+                            <th>Відділ</th>
+                            <th>Трек-номер</th>
+                            <th>Оновлено користувачем</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body">
+                        <!-- Дані завантажуються через JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <a href="#" id="exportHistoryBtn" class="btn btn-excel">Звіт</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальне вікно для друку адресного ярлика -->
+<div class="modal fade" id="printLabelModal" tabindex="-1" aria-labelledby="printLabelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="printLabelModalLabel">Друкувати адресний ярлик</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="receiver_dept" class="form-label">Виберіть відділ одержувач</label>
+                    <select class="form-select" id="receiver_dept" name="receiver_dept" required>
+                        <option value="">Не вказано</option>
+                        {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
+                            <option value="{{ dept.id }}">{{ dept.deptname }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="modal-body">
-                    <form id="barcodeForm">
-                        <div class="mb-3">
-                            <label for="barcode" class="form-label">Штрих-код</label>
-                            <input type="text" class="form-control" id="barcode" name="barcode" maxlength="13" placeholder="Введіть штрих-код" required autofocus>
-                        </div>
-                        <div class="mb-3">
-                            <button type="button" class="btn btn-outline-secondary" id="toggleSelectAll">Вибрати всі</button>
-                        </div>
-                        <div class="card">
-                            <div class="card-body p-0">
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <table class="table table-striped mb-0" id="barcode-table">
-                                        <thead class="sticky-header">
-                                            <tr>
-                                                <th class="col-select">Вибрати</th>
-                                                <th class="col-serial">Серійний номер</th>
-                                                <th class="col-model">Модель картриджа</th>
-                                                <th class="col-date">Дата відправки</th>
-                                                <th class="col-dept">Відділ (куди)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="barcode-table-body">
-                                            <!-- Дані завантажуються через JS -->
-                                        </tbody>
-                                    </table>
-                                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ukrposhta" id="printLabelConfirmBtn">Друкувати</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальне вікно для введення штрих-коду -->
+<div class="modal fade" id="barcodeModal" tabindex="-1" aria-labelledby="barcodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="barcodeModalLabel">Вказати штрих-код для картриджів</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="barcodeForm">
+                    <div class="mb-3">
+                        <label for="barcode" class="form-label">Штрих-код</label>
+                        <input type="text" class="form-control" id="barcode" name="barcode" maxlength="13" placeholder="Введіть штрих-код" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-secondary" id="toggleSelectAll">Вибрати всі</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-body p-0">
+                            <div style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-striped mb-0" id="barcode-table">
+                                    <thead class="sticky-header">
+                                        <tr>
+                                            <th class="col-select">Вибрати</th>
+                                            <th class="col-serial">Серійний номер</th>
+                                            <th class="col-model">Модель картриджа</th>
+                                            <th class="col-date">Дата відправки</th>
+                                            <th class="col-dept">Відділ (куди)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="barcode-table-body">
+                                        <!-- Дані завантажуються через JS -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
-                        <div id="no-cartridges-message" class="alert alert-info mt-3 d-none" role="alert">
-                            Немає картриджів без штрих-коду для присвоєння.
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
-                    <button type="button" class="btn btn-primary" id="confirmBarcode">Вказати</button>
-                </div>
+                    </div>
+                    <div id="no-cartridges-message" class="alert alert-info mt-3 d-none" role="alert">
+                        Немає картриджів без штрих-коду для присвоєння.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="button" class="btn btn-primary" id="confirmBarcode">Вказати</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Таблиця картриджів "В дорозі" -->
-    <div class="mt-5">
-        <div class="d-flex justify-content-between align-items-center">
-            <h3>Картриджі в дорозі</h3>
-            <div class="d-flex gap-2">
-                <!-- Кнопка "Адреса" з випадаючим меню -->
-                <div class="dropdown">
-                    <button class="btn btn-ukrposhta dropdown-toggle" type="button" id="addressDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        Адреса
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="addressDropdown">
-                        <li><a class="dropdown-item" href="#" onclick="printLabelModal.show(); return false;">Друкувати ярлик</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="barcodeModal.show(); return false;">Вказати штрих-код</a></li>
-                    </ul>
-                </div>
-                <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
+<!-- Контейнер для таблиці "Картриджі в дорозі" -->
+<div class="mt-5">
+    <div class="d-flex justify-content-between align-items-center">
+        <h3>Картриджі в дорозі</h3>
+        <div class="d-flex gap-2">
+            <div class="dropdown">
+                <button class="btn btn-ukrposhta dropdown-toggle" type="button" id="addressDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Адреса
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="addressDropdown">
+                    <li><a class="dropdown-item" href="#" onclick="printLabelModal.show(); return false;">Друкувати ярлик</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="barcodeModal.show(); return false;">Вказати штрих-код</a></li>
+                </ul>
             </div>
-        </div>
-        <div class="card">
-            <div class="card-body p-0">
-                <div style="max-height: 300px; overflow-y: auto;">
-                    <table class="table table-striped mb-0" id="in-transit-table">
-                        <thead class="sticky-header">
-                            <tr>
-                                <th class="col-id">ID</th>
-                                <th class="col-serial">Серійний номер</th>
-                                <th class="col-model">Модель картриджа</th>
-                                <th class="col-date">Дата відправки</th>
-                                <th class="col-dept">Відділ (куди)</th>
-                                <th class="col-track">Трек-номер</th>
-                            </tr>
-                        </thead>
-                        <tbody id="in-transit-table-body">
-                            <!-- Дані завантажуються через JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <a href="/export/in_transit" class="btn btn-excel">Звіт</a>
         </div>
     </div>
-
-    <!-- Таблиця картриджів "На зберіганні" -->
-    <div class="mt-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <h3>Картриджі на зберіганні</h3>
-            <a href="/export/in_storage" class="btn btn-excel">Звіт</a>
-        </div>
-        <div class="card">
-            <div class="card-body p-0">
-                <div style="max-height: 300px; overflow-y: auto;">
-                    <table class="table table-striped mb-0" id="in-storage-table">
-                        <thead class="sticky-header">
-                            <tr>
-                                <th class="col-id">ID</th>
-                                <th class="col-serial">Серійний номер</th>
-                                <th class="col-model">Модель картриджа</th>
-                                <th class="col-date">Дата обробки</th>
-                                <th class="col-dept">Відділ</th>
-                                <th class="col-status">Статус</th>
-                            </tr>
-                        </thead>
-                        <tbody id="in-storage-table-body">
-                            <!-- Дані завантажуються через JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <div id="in-transit-table" class="table-container">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th class="col-serial">Серійний номер</th>
+                    <th class="col-model">Модель картриджа</th>
+                    <th class="col-date">Дата відправки</th>
+                    <th class="col-dept">Відділ (куди)</th>
+                    <th class="col-track">Трек-номер</th>
+                </tr>
+            </thead>
+            <tbody id="in-transit-table-body">
+                <!-- Дані завантажуються через JS -->
+            </tbody>
+        </table>
     </div>
+</div>
 
-    <!-- Додаємо стилі -->
-    <style>
-        .sticky-header {
-            position: sticky;
-            top: 0;
-            background-color: #f8f9fa;
-            z-index: 1;
-        }
-        .sticky-header th {
-            border-bottom: 2px solid #dee2e6;
-        }
-        .col-id { width: 5%; }
-        .col-serial { width: 25%; }
-        .col-model { width: 25%; }
-        .col-date { width: 20%; }
-        .col-dept { width: 22%; }
-        .col-track { width: 20%; }
-        .col-status { width: 20%; }
-        .col-select { width: 8%; }
-        .serial-link {
-            color: #007bff;
-            text-decoration: underline;
-            cursor: pointer;
-        }
-        .serial-link:hover {
-            color: #0056b3;
-        }
-        .process-link {
-            color: #007bff;
-            text-decoration: underline;
-            cursor: pointer;
-        }
-        .process-link:hover {
-            color: #0056b3;
-        }
-        .btn-excel {
-            background-color: #1D6F42;
-            color: white;
-            border: none;
-        }
-        .btn-excel:hover {
-            background-color: #155932;
-            color: white;
-        }
-        .btn-ukrposhta {
-            background-color: #FFC107;
-            color: #000;
-        }
-        .btn-ukrposhta:hover {
-            background-color: #FFB300;
-        }
-        .btn-ukrposhta.dropdown-toggle.show {
-            background-color: #FFB300 !important;
-            color: #000 !important;
-        }
-        .serial-suggestions.show {
-            display: block;
-        }
-        .serial-suggestions {
-            word-break: break-word;
-            white-space: normal;
-            overflow-x: hidden;
-        }
-        .serial-suggestions .dropdown-item {
-            white-space: normal;
-            overflow-x: hidden;
-        }
-        .double-blink {
-            animation: double-blink 0.4s step-end 2;
-        }
-        @keyframes double-blink {
-            0%, 50% { color: red; }
-            25%, 75%, 100% { color: inherit; }
-        }
-        .table td, .table th {
-            padding: 0.5rem;
-        }
-    </style>
+<!-- Контейнер для таблиці "Картриджі на зберіганні" -->
+<div class="mt-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <h3>Картриджі на зберіганні</h3>
+        <a href="/export/in_storage" class="btn btn-excel">Звіт</a>
+    </div>
+    <div id="in-storage-table" class="table-container">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th class="col-serial">Серійний номер</th>
+                    <th class="col-model">Модель картриджа</th>
+                    <th class="col-date">Дата обробки</th>
+                    <th class="col-dept">Відділ</th>
+                    <th class="col-status">Статус</th>
+                </tr>
+            </thead>
+            <tbody id="in-storage-table-body">
+                <!-- Дані завантажуються через JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Додаємо стилі -->
+<style>
+    .sticky-header {
+        position: sticky;
+        top: 0;
+        background-color: #f1f3f5;
+        z-index: 1;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .sticky-header th {
+        border-bottom: 1px solid #e9ecef;
+    }
+    .col-id { width: 5%; }
+    .col-serial { width: 25%; }
+    .col-model { width: 25%; }
+    .col-date { width: 20%; }
+    .col-dept { width: 22%; }
+    .col-track { width: 20%; }
+    .col-status { width: 20%; }
+    .col-select { width: 8%; }
+    .serial-link {
+        color: #007bff;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+    .serial-link:hover {
+        color: #0056b3;
+    }
+    .process-link {
+        color: #007bff;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+    .process-link:hover {
+        color: #0056b3;
+    }
+    .btn-excel {
+        background-color: #1D6F42;
+        color: white;
+        border: none;
+    }
+    .btn-excel:hover {
+        background-color: #155932;
+        color: white;
+    }
+    .btn-ukrposhta {
+        background-color: #FFC107;
+        color: #000;
+    }
+    .btn-ukrposhta:hover {
+        background-color: #FFB300;
+    }
+    .btn-ukrposhta.dropdown-toggle.show {
+        background-color: #FFB300 !important;
+        color: #000 !important;
+    }
+    .table-container {
+        height: 260px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #e9ecef;
+        background-color: #ffffff;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .table {
+        margin-bottom: 0;
+    }
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: #f8f9fa;
+    }
+    .table tbody tr:hover {
+        background-color: #e9ecef;
+    }
+    .group-header {
+        background-color: #f1f3f5;
+        font-weight: 500;
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .group-header:hover {
+        background-color: #e9ecef;
+    }
+    .group-header .toggle-icon::before {
+        content: '\25B6';
+        display: inline-block;
+        margin-right: 0.5rem;
+        color: #000;
+        font-size: 12px;
+    }
+    .group-header[aria-expanded="true"] .toggle-icon::before {
+        content: '\25BC';
+        color: #000;
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
-    <script>
-        window.addEventListener('DOMContentLoaded', (event) => {
-            fetchInTransitCartridges();
-            fetchInStorageCartridges();
-        });
+<script>
+    window.addEventListener('DOMContentLoaded', (event) => {
+        fetchInTransitCartridges();
+        fetchInStorageCartridges();
+    });
 
-        const serialInput = document.getElementById('serial_num');
-        const suggestionsDropdown = document.getElementById('serial-suggestions');
-        const execDeptSelect = document.getElementById('exec_dept');
-        const printerSelect = document.getElementById('printer');
-        const statusSelect = document.getElementById('status');
-        const barcodeModal = new bootstrap.Modal(document.getElementById('barcodeModal'));
-        const barcodeInput = document.getElementById('barcode');
-        const barcodeTableBody = document.getElementById('barcode-table-body');
-        const noCartridgesMessage = document.getElementById('no-cartridges-message');
-        const toggleSelectAllBtn = document.getElementById('toggleSelectAll');
+    const serialInput = document.getElementById('serial_num');
+    const suggestionsDropdown = document.getElementById('serial-suggestions');
+    const execDeptSelect = document.getElementById('exec_dept');
+    const printerSelect = document.getElementById('printer');
+    const statusSelect = document.getElementById('status');
+    const barcodeModal = new bootstrap.Modal(document.getElementById('barcodeModal'));
+    const barcodeInput = document.getElementById('barcode');
+    const barcodeTableBody = document.getElementById('barcode-table-body');
+    const noCartridgesMessage = document.getElementById('no-cartridges-message');
+    const toggleSelectAllBtn = document.getElementById('toggleSelectAll');
 
-        let selectedIndex = -1;
+    let selectedIndex = -1;
 
-        // Обробка введення серійного номера
-        serialInput.addEventListener('input', debounce((e) => {
-            const query = e.target.value.trim();
-            if (query.length >= 2) {
-                fetch(`/api/cartridges?search=${encodeURIComponent(query)}`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                .then(response => response.json())
-                .then(data => updateSuggestions(data.cartridges))
-                .catch(error => console.error('Помилка:', error));
-            } else {
-                suggestionsDropdown.innerHTML = '';
-                suggestionsDropdown.classList.remove('show');
-            }
-        }, 300));
+    // Ініціалізація модальних вікон
+    const processModal = new bootstrap.Modal(document.getElementById('processModal'));
+    const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+    const printLabelModal = new bootstrap.Modal(document.getElementById('printLabelModal'));
 
-        // Обробка клавіатури для навігації по пропозиціях
-        serialInput.addEventListener('keydown', (e) => {
-            const items = suggestionsDropdown.querySelectorAll('.dropdown-item');
-            if (items.length === 0) return;
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-                updateSelection(items);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                selectedIndex = Math.max(selectedIndex - 1, -1);
-                updateSelection(items);
-            } else if (e.key === 'Enter' && selectedIndex >= 0) {
-                e.preventDefault();
-                items[selectedIndex].click();
-            }
-        });
-
-        // Оновлення пропозицій у dropdown
-        function updateSuggestions(cartridges) {
+    // Обробка введення серійного номера
+    serialInput.addEventListener('input', debounce((e) => {
+        const query = e.target.value.trim();
+        if (query.length >= 2) {
+            fetch(`/api/cartridges?search=${encodeURIComponent(query)}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => updateSuggestions(data.cartridges))
+            .catch(error => console.error('Помилка:', error));
+        } else {
             suggestionsDropdown.innerHTML = '';
-            selectedIndex = -1;
-            if (cartridges.length > 0) {
-                cartridges.forEach(cartridge => {
-                    const item = document.createElement('a');
-                    item.classList.add('dropdown-item');
-                    item.href = '#';
-                    item.textContent = `${cartridge.serial_num} (${cartridge.cartridge_model || 'Без моделі'})`;
-                    item.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        serialInput.value = cartridge.serial_num;
-                        suggestionsDropdown.innerHTML = '';
-                        suggestionsDropdown.classList.remove('show');
-                        triggerBlurEvent();
-                    });
-                    suggestionsDropdown.appendChild(item);
+            suggestionsDropdown.classList.remove('show');
+        }
+    }, 300));
+
+    // Обробка клавіатури для навігації по пропозиціях
+    serialInput.addEventListener('keydown', (e) => {
+        const items = suggestionsDropdown.querySelectorAll('.dropdown-item');
+        if (items.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+            updateSelection(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, -1);
+            updateSelection(items);
+        } else if (e.key === 'Enter' && selectedIndex >= 0) {
+            e.preventDefault();
+            items[selectedIndex].click();
+        }
+    });
+
+    // Оновлення пропозицій у dropdown
+    function updateSuggestions(cartridges) {
+        suggestionsDropdown.innerHTML = '';
+        selectedIndex = -1;
+        if (cartridges.length > 0) {
+            cartridges.forEach(cartridge => {
+                const item = document.createElement('a');
+                item.classList.add('dropdown-item');
+                item.href = '#';
+                item.textContent = `${cartridge.serial_num} (${cartridge.cartridge_model || 'Без моделі'})`;
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    serialInput.value = cartridge.serial_num;
+                    suggestionsDropdown.innerHTML = '';
+                    suggestionsDropdown.classList.remove('show');
+                    triggerBlurEvent();
                 });
-                suggestionsDropdown.classList.add('show');
-            } else {
-                suggestionsDropdown.classList.remove('show');
-            }
-        }
-
-        // Оновлення виділення в dropdown
-        function updateSelection(items) {
-            items.forEach((item, index) => {
-                item.classList.toggle('active', index === selectedIndex);
+                suggestionsDropdown.appendChild(item);
             });
-            if (selectedIndex >= 0) {
-                items[selectedIndex].scrollIntoView({ block: 'nearest' });
-            }
+            suggestionsDropdown.classList.add('show');
+        } else {
+            suggestionsDropdown.classList.remove('show');
         }
+    }
 
-        // Debounce-функція для затримки запитів
-        function debounce(func, wait) {
-            let timeout;
-            return function (...args) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), wait);
-            };
+    // Оновлення виділення в dropdown
+    function updateSelection(items) {
+        items.forEach((item, index) => {
+            item.classList.toggle('active', index === selectedIndex);
+        });
+        if (selectedIndex >= 0) {
+            items[selectedIndex].scrollIntoView({ block: 'nearest' });
         }
+    }
 
-        // Обробка blur для serial_num
-        serialInput.addEventListener('blur', (e) => {
-            const serialNum = e.target.value.trim();
-            if (serialNum) {
-                let isModalOpen = processModal._isShown;
-                fetch('/check_cartridge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ serial_num: serialNum })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (isModalOpen) {
-                        if (data.success && data.latest_status) {
-                            document.getElementById('status').value = data.latest_status.status || '0';
-                            document.getElementById('exec_dept').value = data.latest_status.exec_dept || '';
-                            document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
-                        } else {
-                            const label = document.querySelector('label[for="serial_num"]');
-                            label.classList.add('double-blink');
-                            setTimeout(() => label.classList.remove('double-blink'), 1200);
-                            document.getElementById('serial_num').focus();
-                            document.getElementById('serial_num').select();
-                        }
-                    }
-                })
-                .catch(error => {
-                    if (isModalOpen) {
+    // Debounce-функція
+    function debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    // Обробка blur для serial_num
+    serialInput.addEventListener('blur', (e) => {
+        const serialNum = e.target.value.trim();
+        if (serialNum) {
+            let isModalOpen = processModal._isShown;
+            fetch('/check_cartridge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serial_num: serialNum })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (isModalOpen) {
+                    if (data.success && data.latest_status) {
+                        document.getElementById('status').value = data.latest_status.status || '0';
+                        document.getElementById('exec_dept').value = data.latest_status.exec_dept || '';
+                        document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
+                    } else {
                         const label = document.querySelector('label[for="serial_num"]');
                         label.classList.add('double-blink');
                         setTimeout(() => label.classList.remove('double-blink'), 1200);
                         document.getElementById('serial_num').focus();
                         document.getElementById('serial_num').select();
                     }
-                });
-            }
-        });
-
-        // Функція для програмного виклику blur
-        function triggerBlurEvent() {
-            const event = new Event('blur');
-            serialInput.dispatchEvent(event);
+                }
+            })
+            .catch(error => {
+                if (isModalOpen) {
+                    const label = document.querySelector('label[for="serial_num"]');
+                    label.classList.add('double-blink');
+                    setTimeout(() => label.classList.remove('double-blink'), 1200);
+                    document.getElementById('serial_num').focus();
+                    document.getElementById('serial_num').select();
+                }
+            });
         }
+    });
 
-        // Динамічне завантаження принтерів при зміні відділу
-        execDeptSelect.addEventListener('change', () => {
-            const deptId = execDeptSelect.value;
-            if (deptId) {
-                fetch(`/api/printers_by_dept/${deptId}`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    printerSelect.innerHTML = '<option value="">Виберіть принтер (необов’язково)</option>';
-                    data.printers.forEach(printer => {
-                        const option = document.createElement('option');
-                        option.value = printer.id;
-                        option.textContent = printer.model_name;
-                        printerSelect.appendChild(option);
-                    });
-                    printerSelect.disabled = false;
-                })
-                .catch(error => {
-                    console.error('Помилка завантаження принтерів:', error);
-                    printerSelect.innerHTML = '<option value="">Помилка завантаження</option>';
-                    printerSelect.disabled = true;
+    // Програмний blur
+    function triggerBlurEvent() {
+        const event = new Event('blur');
+        serialInput.dispatchEvent(event);
+    }
+
+    // Завантаження принтерів
+    execDeptSelect.addEventListener('change', () => {
+        const deptId = execDeptSelect.value;
+        if (deptId) {
+            fetch(`/api/printers_by_dept/${deptId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                printerSelect.innerHTML = '<option value="">Виберіть принтер (необов’язково)</option>';
+                data.printers.forEach(printer => {
+                    const option = document.createElement('option');
+                    option.value = printer.id;
+                    option.textContent = printer.model_name;
+                    printerSelect.appendChild(option);
                 });
-            } else {
-                printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
+                printerSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Помилка завантаження принтерів:', error);
+                printerSelect.innerHTML = '<option value="">Помилка завантаження</option>';
                 printerSelect.disabled = true;
-            }
-        });
-
-        // Очищення форми при закритті модального вікна
-        document.getElementById('processModal').addEventListener('hidden.bs.modal', () => {
-            processModal._isShown = false;
-            suggestionsDropdown.innerHTML = '';
-            suggestionsDropdown.classList.remove('show');
-            document.getElementById('processForm').reset();
+            });
+        } else {
             printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
             printerSelect.disabled = true;
-        });
-
-        // Завантаження картриджів "В дорозі"
-        function fetchInTransitCartridges() {
-            fetch('/api/cartridges_by_status?status_list=3&status_sort=asc', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.error || `HTTP error! Status: ${response.status}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => updateInTransitTable(data.cartridges))
-            .catch(error => {
-                console.error('Помилка завантаження картриджів:', error);
-                alert(`Помилка: ${error.message}`);
-            });
         }
+    });
 
-        function updateInTransitTable(cartridges) {
-            const tbody = document.getElementById('in-transit-table-body');
-            tbody.innerHTML = '';
-            cartridges.forEach(cartridge => {
-                const row = document.createElement('tr');
-                const formattedDate = cartridge.date_ofchange
-                            ? new Intl.DateTimeFormat('uk-UA', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric'
-                              }).format(new Date(cartridge.date_ofchange))
-                            : 'Не вказано';
-                row.innerHTML = `
-                    <td>${cartridge.id}</td>
-                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
-                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
-                    <td>${formattedDate}</td>
-                    <td>${cartridge.dept_name || 'Не вказано'}</td>
-                    <td>${cartridge.parcel_track || 'Не вказано'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
+    // Очищення форми
+    document.getElementById('processModal').addEventListener('hidden.bs.modal', () => {
+        processModal._isShown = false;
+        suggestionsDropdown.innerHTML = '';
+        suggestionsDropdown.classList.remove('show');
+        document.getElementById('processForm').reset();
+        printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
+        printerSelect.disabled = true;
+    });
 
-        // Завантаження картриджів "На зберіганні"
-        function fetchInStorageCartridges() {
-            fetch('/api/cartridges_by_status?status_list=1,6&status_sort=desc', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => updateInStorageTable(data.cartridges))
-            .catch(error => console.error('Помилка завантаження картриджів:', error));
-        }
-
-        function updateInStorageTable(cartridges) {
-            const tbody = document.getElementById('in-storage-table-body');
-            tbody.innerHTML = '';
-            const statusMap = {
-                1: 'На зберіганні (порожній)',
-                6: 'На зберіганні (заправлений)'
-            };
-            cartridges.forEach(cartridge => {
-                const row = document.createElement('tr');
-                const formattedDate = cartridge.date_ofchange
-                            ? new Intl.DateTimeFormat('uk-UA', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric'
-                              }).format(new Date(cartridge.date_ofchange))
-                            : 'Не вказано';
-                row.innerHTML = `
-                    <td>${cartridge.id}</td>
-                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
-                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
-                    <td>${formattedDate}</td>
-                    <td>${cartridge.dept_name || 'Не вказано'}</td>
-                    <td>${statusMap[cartridge.status] || 'Невідомий'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // Ініціалізація модальних вікон
-        const processModal = new bootstrap.Modal(document.getElementById('processModal'));
-        const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
-        const printLabelModal = new bootstrap.Modal(document.getElementById('printLabelModal'));
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'F2') {
-                e.preventDefault();
-                processModal.show();
+    // Завантаження картриджів "В дорозі"
+    function fetchInTransitCartridges() {
+        fetch('/api/cartridges_by_status?status_list=3&status_sort=asc', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || `HTTP error! Status: ${response.status}`);
+                });
             }
+            return response.json();
+        })
+        .then(data => {
+            updateInTransitTable(data.cartridges);
+        })
+        .catch(error => {
+            console.error('Помилка завантаження картриджів:', error);
+            alert(`Помилка: ${error.message}`);
         });
+    }
 
-        document.getElementById('processModal').addEventListener('shown.bs.modal', () => {
-            document.getElementById('serial_num').focus();
-        });
-
-        document.getElementById('processModal').addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') processModal.hide();
-        });
-
-        document.getElementById('confirmProcess').addEventListener('click', submitForm);
-        document.getElementById('processForm').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                submitForm();
+    // Завантаження картриджів "На зберіганні"
+    function fetchInStorageCartridges() {
+        fetch('/api/cartridges_by_status?status_list=1,6&status_sort=desc', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
             }
+            return response.json();
+        })
+        .then(data => {
+            updateInStorageTable(data.cartridges);
+        })
+        .catch(error => console.error('Помилка завантаження картриджів:', error));
+    }
+
+    // Оновлення таблиці "Картриджі в дорозі"
+    function updateInTransitTable(cartridges) {
+        const tbody = document.getElementById('in-transit-table-body');
+        tbody.innerHTML = '';
+
+        // Групуємо за датою
+        const grouped = {};
+        cartridges.forEach(cartridge => {
+            const date = cartridge.date_ofchange ? new Date(cartridge.date_ofchange).toISOString().split('T')[0] : 'Не вказано';
+            if (!grouped[date]) {
+                grouped[date] = [];
+            }
+            grouped[date].push(cartridge);
         });
 
-        // Обробка кнопки "Друкувати ярлик"
-        document.getElementById('printLabelBtn').addEventListener('click', () => {
-            const deptId = document.getElementById('exec_dept').value;
-            if (deptId) {
-                const url = `/generate_shipping_label/${deptId}`;
-                window.open(url, '_blank');
+        // Сортуємо дати
+        const sortedDates = Object.keys(grouped).sort((a, b) => a === 'Не вказано' ? 1 : b === 'Не вказано' ? -1 : new Date(b) - new Date(a));
+
+        sortedDates.forEach(date => {
+            const groupId = `in-transit-group-${date.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            const formattedDate = date !== 'Не вказано' ? new Intl.DateTimeFormat('uk-UA', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }).format(new Date(date)) : 'Не вказано';
+            const count = grouped[date].length;
+
+            // Додаємо заголовок групи
+            const groupHeader = document.createElement('tr');
+            groupHeader.classList.add('group-header');
+            groupHeader.setAttribute('data-bs-toggle', 'collapse');
+            groupHeader.setAttribute('data-bs-target', `#${groupId}`);
+            groupHeader.setAttribute('aria-expanded', 'false');
+            groupHeader.setAttribute('aria-controls', groupId);
+            groupHeader.innerHTML = `
+                <td colspan="5">
+                    <span class="toggle-icon"></span>
+                    ${formattedDate} (${count} шт.)
+                </td>
+            `;
+            tbody.appendChild(groupHeader);
+
+            // Додаємо вміст групи
+            const collapseRow = document.createElement('tr');
+            collapseRow.innerHTML = `
+                <td colspan="5">
+                    <div class="collapse" id="${groupId}">
+                        <table class="table table-striped mb-0">
+                            <tbody>
+                                ${grouped[date].map(cartridge => `
+                                    <tr>
+                                        <td class="col-serial">
+                                            <a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a>
+                                        </td>
+                                        <td class="col-model">${cartridge.cartridge_model || 'Не вказано'}</td>
+                                        <td class="col-date">${formattedDate}</td>
+                                        <td class="col-dept">${cartridge.dept_name || 'Не вказано'}</td>
+                                        <td class="col-track">${cartridge.parcel_track || 'Не вказано'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(collapseRow);
+        });
+    }
+
+    // Оновлення таблиці "Картриджі на зберіганні"
+    function updateInStorageTable(cartridges) {
+        const tbody = document.getElementById('in-storage-table-body');
+        tbody.innerHTML = '';
+
+        // Групуємо за моделлю картриджа
+        const grouped = {};
+        cartridges.forEach(cartridge => {
+            const model = cartridge.cartridge_model || 'Не вказано';
+            if (!grouped[model]) {
+                grouped[model] = [];
+            }
+            grouped[model].push(cartridge);
+        });
+
+        // Сортуємо моделі
+        const sortedModels = Object.keys(grouped).sort();
+
+        sortedModels.forEach(model => {
+            const groupId = `in-storage-group-${model.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            const count = grouped[model].length;
+
+            // Додаємо заголовок групи
+            const groupHeader = document.createElement('tr');
+            groupHeader.classList.add('group-header');
+            groupHeader.setAttribute('data-bs-toggle', 'collapse');
+            groupHeader.setAttribute('data-bs-target', `#${groupId}`);
+            groupHeader.setAttribute('aria-expanded', 'false');
+            groupHeader.setAttribute('aria-controls', groupId);
+            groupHeader.innerHTML = `
+                <td colspan="5">
+                    <span class="toggle-icon"></span>
+                    ${model} (${count} шт.)
+                </td>
+            `;
+            tbody.appendChild(groupHeader);
+
+            // Додаємо вміст групи
+            const collapseRow = document.createElement('tr');
+            collapseRow.innerHTML = `
+                <td colspan="5">
+                    <div class="collapse" id="${groupId}">
+                        <table class="table table-striped mb-0">
+                            <tbody>
+                                ${grouped[model].map(cartridge => {
+                                    const formattedDate = cartridge.date_ofchange ? new Intl.DateTimeFormat('uk-UA', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric'
+                                    }).format(new Date(cartridge.date_ofchange)) : 'Не вказано';
+                                    const statusMap = {
+                                        1: 'На зберіганні (порожній)',
+                                        6: 'На зберіганні (заправлений)'
+                                    };
+                                    return `
+                                        <tr>
+                                            <td class="col-serial">
+                                                <a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a>
+                                            </td>
+                                            <td class="col-model">${cartridge.cartridge_model || 'Не вказано'}</td>
+                                            <td class="col-date">${formattedDate}</td>
+                                            <td class="col-dept">${cartridge.dept_name || 'Не вказано'}</td>
+                                            <td class="col-status">${statusMap[cartridge.status] || 'Невідомий'}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(collapseRow);
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            e.preventDefault();
+            processModal.show();
+        }
+    });
+
+    document.getElementById('processModal').addEventListener('shown.bs.modal', () => {
+        document.getElementById('serial_num').focus();
+    });
+
+    document.getElementById('processModal').addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') processModal.hide();
+    });
+
+    document.getElementById('confirmProcess').addEventListener('click', submitForm);
+    document.getElementById('processForm').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitForm();
+        }
+    });
+
+    // Друкування ярлика
+    document.getElementById('printLabelBtn').addEventListener('click', () => {
+        const deptId = document.getElementById('exec_dept').value;
+        if (deptId) {
+            const url = `/generate_shipping_label/${deptId}`;
+            window.open(url, '_blank');
+        } else {
+            alert('Будь ласка, виберіть відділ!');
+        }
+    });
+
+    // Відправка форми
+    function submitForm() {
+        const formData = new FormData(document.getElementById('processForm'));
+        fetch('/add_cartridge_event', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Подію додано!');
+                processModal.hide();
+                document.getElementById('processForm').reset();
+                fetchInTransitCartridges();
+                fetchInStorageCartridges();
+                if (window.location.pathname === '/cartridges') {
+                    fetchCartridges(document.getElementById('search').value.trim(), 1);
+                }
             } else {
-                alert('Будь ласка, виберіть відділ!');
+                if (data.message === 'Цей статус уже встановлено для картриджа!') {
+                    const statusLabel = document.querySelector('label[for="status"]');
+                    statusLabel.classList.add('double-blink');
+                    setTimeout(() => statusLabel.classList.remove('double-blink'), 1200);
+                    statusSelect.focus();
+                } else {
+                    alert('Помилка: ' + data.message);
+                }
             }
-        });
+        })
+        .catch(error => alert('Помилка при відправці: ' + error));
+    }
 
-        // Відправка форми з підсвіткою помилки для статусу
-        function submitForm() {
-            const formData = new FormData(document.getElementById('processForm'));
-            fetch('/add_cartridge_event', {
+    // Показ історії
+    function showHistory(cartridgeId) {
+        fetch(`/api/cartridge_history/${cartridgeId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            updateHistoryTable(data.history);
+            const exportBtn = document.getElementById('exportHistoryBtn');
+            exportBtn.href = `/export/cartridge_history/${cartridgeId}`;
+            historyModal.show();
+        })
+        .catch(error => console.error('Помилка:', error));
+    }
+
+    // Оновлення таблиці історії
+    function updateHistoryTable(history) {
+        const tbody = document.getElementById('history-table-body');
+        tbody.innerHTML = '';
+        const statusMap = {
+            0: 'Не вказано',
+            1: 'На зберіганні (порожній)',
+            2: 'Відправлено в користування',
+            3: 'Відправлено на заправку',
+            4: 'Непридатний (списаний)',
+            5: 'Одноразовий (фарба у банці)',
+            6: 'На зберіганні (заправлений)'
+        };
+        history.forEach(event => {
+            const row = document.createElement('tr');
+            const formattedDate = event.date_ofchange
+                ? new Intl.DateTimeFormat('uk-UA', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                  }).format(new Date(event.date_ofchange))
+                : 'Не вказано';
+            row.innerHTML = `
+                <td>${formattedDate}</td>
+                <td>${statusMap[event.status] || 'Невідомий'}</td>
+                <td>${event.dept_name || 'Не вказано'}</td>
+                <td>${event.parcel_track || 'Не вказано'}</td>
+                <td>${event.user_login || 'Не вказано'}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Друкування ярлика в модальному вікні
+    document.getElementById('printLabelConfirmBtn').addEventListener('click', () => {
+        const deptId = document.getElementById('receiver_dept').value;
+        if (deptId) {
+            const url = `/generate_shipping_label/${deptId}`;
+            window.open(url, '_blank');
+            printLabelModal.hide();
+        } else {
+            alert('Будь ласка, виберіть відділ одержувач');
+        }
+    });
+
+    // Завантаження картриджів для штрих-коду
+    document.getElementById('barcodeModal').addEventListener('shown.bs.modal', () => {
+        fetch('/api/cartridges_by_status?status_list=3&status_sort=asc', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => updateBarcodeTable(data.cartridges))
+        .catch(error => {
+            console.error('Помилка:', error);
+            noCartridgesMessage.classList.remove('d-none');
+            barcodeTableBody.innerHTML = '';
+        });
+        barcodeInput.focus();
+    });
+
+    // Очищення форми штрих-коду
+    document.getElementById('barcodeModal').addEventListener('hidden.bs.modal', () => {
+        barcodeInput.value = '';
+        barcodeTableBody.innerHTML = '';
+        noCartridgesMessage.classList.add('d-none');
+        toggleSelectAllBtn.textContent = 'Вибрати всі';
+    });
+
+    // Оновлення таблиці штрих-коду
+    function updateBarcodeTable(cartridges) {
+        barcodeTableBody.innerHTML = '';
+        const filteredCartridges = cartridges.filter(cartridge => !cartridge.parcel_track);
+        if (filteredCartridges.length === 0) {
+            noCartridgesMessage.classList.remove('d-none');
+            return;
+        }
+        noCartridgesMessage.classList.add('d-none');
+        filteredCartridges.forEach(cartridge => {
+            const row = document.createElement('tr');
+            const formattedDate = cartridge.date_ofchange
+                ? new Intl.DateTimeFormat('uk-UA', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                  }).format(new Date(cartridge.date_ofchange))
+                : 'Не вказано';
+            row.innerHTML = `
+                <td><input type="checkbox" class="form-check-input cartridge-select" data-cartridge-id="${cartridge.id}" checked></td>
+                <td>${cartridge.serial_num}</td>
+                <td>${cartridge.cartridge_model || 'Не вказано'}</td>
+                <td>${formattedDate}</td>
+                <td>${cartridge.dept_name || 'Не вказано'}</td>
+            `;
+            barcodeTableBody.appendChild(row);
+        });
+    }
+
+    // Вибрати/зняти всі
+    toggleSelectAllBtn.addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('.cartridge-select');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+        toggleSelectAllBtn.textContent = allChecked ? 'Вибрати всі' : 'Зняти всі';
+    });
+
+    // Enter у полі штрих-коду
+    barcodeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('confirmBarcode').click();
+        }
+    });
+
+    // Присвоєння штрих-коду
+    document.getElementById('confirmBarcode').addEventListener('click', () => {
+        const barcode = barcodeInput.value.trim();
+        if (!barcode) {
+            alert('Будь ласка, введіть штрих-код!');
+            barcodeInput.focus();
+            return;
+        }
+
+        const selectedCartridges = Array.from(document.querySelectorAll('.cartridge-select:checked'))
+            .map(checkbox => parseInt(checkbox.dataset.cartridgeId));
+
+        if (selectedCartridges.length === 0) {
+            alert('Будь ласка, виберіть хоча б один картридж!');
+            return;
+        }
+
+        if (confirm('Ви впевнені, що хочете присвоїти штрих-код для вибраних картриджів?')) {
+            fetch('/update_cartridge_barcodes', {
                 method: 'POST',
-                body: formData
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cartridge_ids: selectedCartridges,
+                    barcode: barcode
+                })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Подію додано!');
-                    processModal.hide();
-                    document.getElementById('processForm').reset();
+                    alert('Штрих-код успішно присвоєно!');
+                    barcodeModal.hide();
                     fetchInTransitCartridges();
-                    fetchInStorageCartridges();
-                    if (window.location.pathname === '/cartridges') {
-                        fetchCartridges(document.getElementById('search').value.trim(), 1);
-                    }
                 } else {
-                    if (data.message === 'Цей статус уже встановлено для картриджа!') {
-                        const statusLabel = document.querySelector('label[for="status"]');
-                        statusLabel.classList.add('double-blink');
-                        setTimeout(() => statusLabel.classList.remove('double-blink'), 1200);
-                        statusSelect.focus();
-                    } else {
-                        alert('Помилка: ' + data.message);
-                    }
+                    alert('Помилка: ' + data.message);
                 }
             })
             .catch(error => alert('Помилка при відправці: ' + error));
         }
-
-        // Показ історії
-        function showHistory(cartridgeId) {
-            fetch(`/api/cartridge_history/${cartridgeId}`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                updateHistoryTable(data.history);
-                const exportBtn = document.getElementById('exportHistoryBtn');
-                exportBtn.href = `/export/cartridge_history/${cartridgeId}`;
-                historyModal.show();
-            })
-            .catch(error => console.error('Помилка:', error));
-        }
-
-        // Оновлення таблиці історії
-        function updateHistoryTable(history) {
-            const tbody = document.getElementById('history-table-body');
-            tbody.innerHTML = '';
-            const statusMap = {
-                0: 'Не вказано',
-                1: 'На зберіганні (порожній)',
-                2: 'Відправлено в користування',
-                3: 'Відправлено на заправку',
-                4: 'Непридатний (списаний)',
-                5: 'Одноразовий (фарба у банці)',
-                6: 'На зберіганні (заправлений)'
-            };
-            history.forEach(event => {
-                const row = document.createElement('tr');
-                const formattedDate = event.date_ofchange
-                            ? new Intl.DateTimeFormat('uk-UA', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric'
-                              }).format(new Date(event.date_ofchange))
-                            : 'Не вказано';
-                row.innerHTML = `
-                    <td>${formattedDate}</td>
-                    <td>${statusMap[event.status] || 'Невідомий'}</td>
-                    <td>${event.dept_name || 'Не вказано'}</td>
-                    <td>${event.parcel_track || 'Не вказано'}</td>
-                    <td>${event.user_login || 'Не вказано'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // Обробка друку ярлика в модальному вікні
-        document.getElementById('printLabelConfirmBtn').addEventListener('click', () => {
-            const deptId = document.getElementById('receiver_dept').value;
-            if (deptId) {
-                const url = `/generate_shipping_label/${deptId}`;
-                window.open(url, '_blank');
-                printLabelModal.hide();
-            } else {
-                alert('Будь ласка, виберіть відділ одержувач');
-            }
-        });
-
-        // Завантаження картриджів для модального вікна штрих-коду
-        document.getElementById('barcodeModal').addEventListener('shown.bs.modal', () => {
-            fetch('/api/in_transit_cartridges', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => response.json())
-            .then(data => updateBarcodeTable(data.cartridges))
-            .catch(error => {
-                console.error('Помилка:', error);
-                noCartridgesMessage.classList.remove('d-none');
-                barcodeTableBody.innerHTML = '';
-            });
-            barcodeInput.focus();
-        });
-
-        // Очищення форми при закритті модального вікна штрих-коду
-        document.getElementById('barcodeModal').addEventListener('hidden.bs.modal', () => {
-            barcodeInput.value = '';
-            barcodeTableBody.innerHTML = '';
-            noCartridgesMessage.classList.add('d-none');
-            toggleSelectAllBtn.textContent = 'Вибрати всі';
-        });
-
-        // Оновлення таблиці в модальному вікні штрих-коду
-        function updateBarcodeTable(cartridges) {
-            barcodeTableBody.innerHTML = '';
-            // Фільтруємо картриджі, у яких parcel_track не встановлено
-            const filteredCartridges = cartridges.filter(cartridge => !cartridge.parcel_track);
-            if (filteredCartridges.length === 0) {
-                noCartridgesMessage.classList.remove('d-none');
-                return;
-            }
-            noCartridgesMessage.classList.add('d-none');
-            filteredCartridges.forEach(cartridge => {
-                const row = document.createElement('tr');
-                const formattedDate = cartridge.date_ofchange
-                            ? new Intl.DateTimeFormat('uk-UA', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric'
-                              }).format(new Date(cartridge.date_ofchange))
-                            : 'Не вказано';
-                row.innerHTML = `
-                    <td><input type="checkbox" class="form-check-input cartridge-select" data-cartridge-id="${cartridge.id}" checked></td>
-                    <td>${cartridge.serial_num}</td>
-                    <td>${cartridge.cartridge_model || 'Не вказано'}</td>
-                    <td>${formattedDate}</td>
-                    <td>${cartridge.dept_name || 'Не вказано'}</td>
-                `;
-                barcodeTableBody.appendChild(row);
-            });
-        }
-
-        // Обробка кнопки "Вибрати всі/Зняти всі"
-        toggleSelectAllBtn.addEventListener('click', () => {
-            const checkboxes = document.querySelectorAll('.cartridge-select');
-            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-            checkboxes.forEach(cb => cb.checked = !allChecked);
-            toggleSelectAllBtn.textContent = allChecked ? 'Вибрати всі' : 'Зняти всі';
-        });
-
-        // Обробка натискання Enter у полі штрих-коду
-        barcodeInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('confirmBarcode').click();
-            }
-        });
-
-        // Обробка кнопки "Вказати" для штрих-коду
-        document.getElementById('confirmBarcode').addEventListener('click', () => {
-            const barcode = barcodeInput.value.trim();
-            if (!barcode) {
-                alert('Будь ласка, введіть штрих-код!');
-                barcodeInput.focus();
-                return;
-            }
-
-            const selectedCartridges = Array.from(document.querySelectorAll('.cartridge-select:checked'))
-                .map(checkbox => parseInt(checkbox.dataset.cartridgeId));
-
-            if (selectedCartridges.length === 0) {
-                alert('Будь ласка, виберіть хоча б один картридж!');
-                return;
-            }
-
-            if (confirm('Ви впевнені, що хочете присвоїти штрих-код для вибраних картриджів?')) {
-                fetch('/update_cartridge_barcodes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        cartridge_ids: selectedCartridges,
-                        barcode: barcode
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Штрих-код успішно присвоєно!');
-                        barcodeModal.hide();
-                        fetchInTransitCartridges();
-                    } else {
-                        alert('Помилка: ' + data.message);
-                    }
-                })
-                .catch(error => alert('Помилка при відправці: ' + error));
-            }
-        });
-    </script>
+    });
+</script>
 {% endblock %}

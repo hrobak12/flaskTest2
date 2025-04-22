@@ -1,10 +1,10 @@
 import os, secrets
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, Response, send_file
-from sqlalchemy import func, and_, asc, desc
-# from sqlalchemy.sql import text  # Додаємо імпорт text
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel
+
+from sqlalchemy import func, and_, asc, desc
+
 from datetime import datetime
 import bcrypt
 from openpyxl import Workbook
@@ -12,11 +12,12 @@ from reportlab.lib.pagesizes import A4, mm #, A5, landscape, portrait
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-# from reportlab.graphics import renderPDF
+
 from barcode import Code128
 from barcode.writer import ImageWriter
 from transliterate import translit
 
+from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel
 from config import status_map
 
 app = Flask(__name__)
@@ -748,28 +749,30 @@ def api_cartridges():
     page = request.args.get('page', 1, type=int)
     per_page = 10
 
-    query = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%')).order_by(Cartridges.cartridge_model.asc())
+    # Додаємо JOIN із CartridgeModel для отримання model_name
+    query = db.session.query(Cartridges, CartridgeModel.model_name)\
+                     .outerjoin(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)\
+                     .filter(Cartridges.serial_num.ilike(f'%{search}%'))\
+                     .order_by(CartridgeModel.model_name.asc())
+
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
     cartridges_data = []
-    for cartridge in pagination.items:
+    for cartridge, model_name in pagination.items:
         in_printer_info = None
         if cartridge.in_printer:
             equipment = db.session.get(CustomerEquipment, cartridge.in_printer)
-#            equipment = CustomerEquipment.query.get(cartridge.in_printer)
             if equipment:
                 printer_model = db.session.get(PrinterModel, equipment.print_model)
                 dept = db.session.get(RefillDept, equipment.print_dept)
-#                printer_model = PrinterModel.query.get(equipment.print_model)
-#                dept = RefillDept.query.get(equipment.print_dept)
                 in_printer_info = f"{printer_model.model_name} ({dept.deptname})"
 
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model,
+            'cartridge_model': model_name or 'Не вказано',  # Зберігаємо назву поля, але використовуємо model_name
             'in_printer_info': in_printer_info,
-            'curr_status': cartridge.curr_status  # Переконайся, що це є
+            'curr_status': cartridge.curr_status
         })
 
     pagination_data = {
@@ -1088,19 +1091,20 @@ def export_in_transit():
                                        .filter(CartridgeStatus.date_ofchange <= current_date)\
                                        .group_by(CartridgeStatus.cartridge_id)\
                                        .subquery()
-    in_transit_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname)\
-                                 .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id)\
-                                 .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
-                                 .join(latest_status_subquery,
-                                       and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
-                                            CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date))\
-                                 .filter(CartridgeStatus.status == 3)  # Статус "В дорозі"
+    in_transit_query = db.session.query(Cartridges, CartridgeStatus, RefillDept.deptname, CartridgeModel.model_name) \
+        .join(CartridgeStatus, Cartridges.id == CartridgeStatus.cartridge_id) \
+        .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id) \
+        .outerjoin(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id) \
+        .join(latest_status_subquery,
+              and_(Cartridges.id == latest_status_subquery.c.cartridge_id,
+                   CartridgeStatus.date_ofchange == latest_status_subquery.c.max_date)) \
+        .filter(CartridgeStatus.status == 3)
     cartridges_data = []
-    for cartridge, status, dept_name in in_transit_query.all():
+    for cartridge, status, dept_name, model_name in in_transit_query.all():
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+            'cartridge_model': model_name or 'Не вказано',
             'date_ofchange': status.date_ofchange.strftime('%Y-%m-%d %H:%M:%S'),
             'dept_name': dept_name or 'Не вказано',
             'parcel_track': status.parcel_track or 'Не вказано'
@@ -1144,20 +1148,22 @@ def export_in_transit():
 @login_required
 def export_in_storage():
     # Запит до Cartridges із фільтром по curr_status (1 або 6) і приєднанням RefillDept
-    in_storage_query = db.session.query(Cartridges, RefillDept.deptname)\
-                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
-                                 .filter(Cartridges.curr_status.in_([1, 6]))\
-                                 .order_by(Cartridges.cartridge_model.asc())
 
+    in_storage_query = db.session.query(Cartridges, RefillDept.deptname, CartridgeModel.model_name) \
+        .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id) \
+        .outerjoin(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id) \
+        .filter(Cartridges.curr_status.in_([1, 6])) \
+        .order_by(CartridgeModel.model_name.asc())
     cartridges_data = []
-    for cartridge, dept_name in in_storage_query.all():
+    for cartridge, dept_name, model_name in in_storage_query.all():
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
-            'date_ofchange': cartridge.time_updated.strftime('%Y-%m-%d %H:%M:%S') if cartridge.time_updated else 'Не вказано',
+            'cartridge_model': model_name or 'Не вказано',
+            'date_ofchange': cartridge.time_updated.strftime(
+                '%Y-%m-%d %H:%M:%S') if cartridge.time_updated else 'Не вказано',
             'dept_name': dept_name or 'Не вказано',
-            'status': 'На зберіганні (порожній)' if cartridge.curr_status == 1 else 'На зберіганні (заправлений)'  # Додаємо статус замість parcel_track
+            'status': 'На зберіганні (порожній)' if cartridge.curr_status == 1 else 'На зберіганні (заправлений)'
         })
 
     # Створюємо Excel-файл
@@ -1527,7 +1533,7 @@ def api_report_period():
         report_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+            'cartridge_model': CartridgeModel.query.get(cartridge.cartrg_model_id).model_name or 'Не вказано' if cartridge.cartrg_model_id else 'Не вказано',
             'status': status_map[status.status],
             'date_ofchange': status.date_ofchange.isoformat(),
             'dept_name': dept_name or 'Не вказано',
@@ -1680,7 +1686,7 @@ def mass_add_cartridge_events():
         db.session.add(new_status)
         report_data.append({
             'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model or 'Не вказано',
+            'cartridge_model': CartridgeModel.query.get(cartridge.cartrg_model_id).model_name or 'Не вказано' if cartridge.cartrg_model_id else 'Не вказано',
             'date_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
 
