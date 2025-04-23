@@ -71,7 +71,7 @@ class Cartridges(db.Model):
     cartrg_model_id: Mapped[int] = mapped_column(ForeignKey(CartridgeModel.id), default=1)
     user_updated: Mapped[int] = mapped_column(ForeignKey(User.id))
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
-# Нове поле. Потрібне щоб зразу знати статус картриджа, а не перебирати таблицю історії
+# Нове поле. Потрібне щоб зразу знати поточний статус картриджа, а не перебирати таблицю історії
     curr_status: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     curr_dept: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     curr_parcel_track: Mapped[str] = mapped_column(String(13), nullable=True)

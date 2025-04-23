@@ -23,14 +23,24 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     {% if current_user.is_authenticated %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('processCartridge') }}" id="processCartridge">Обробка</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownProcessing" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Обробка
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdownProcessing">
+                                <li><a class="dropdown-item" href="{{ url_for('processCartridge') }}">Один картридж</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('mass_input') }}">Масовий ввід</a></li>
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('report_period') }}">Звіт за період</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('mass_input') }}" id="massInput">Масовий ввід</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownReports" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Звіти
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdownReports">
+                                <li><a class="dropdown-item" href="{{ url_for('report_period') }}">Звіт за період</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('cartridge_movement_all') }}">Звіт про видачу картриджів (по відділах)</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('cartridge_movement_models') }}">Звіт про видачу картриджів (по моделях)</a></li>
+                            </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownRefs" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -40,7 +50,7 @@
                                 <li><a class="dropdown-item" href="{{ url_for('cartridges') }}">Картриджі</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('equipments') }}">Принтери</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('printer_models') }}">Моделі принтерів</a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('cartridge_models') }}">Моделі картриджів</a></li> <!-- Додано пункт -->
+                                <li><a class="dropdown-item" href="{{ url_for('cartridge_models') }}">Моделі картриджів</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('refill_depts') }}">Відділи</a></li>
                                 {% if current_user.role == 'admin' %}
                                     <li><a class="dropdown-item" href="{{ url_for('users') }}">Користувачі</a></li>

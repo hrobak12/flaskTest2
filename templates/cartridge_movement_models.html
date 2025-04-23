@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container position-relative">
+    <h2>Звіт про видачу заправлених картриджів (по моделях)</h2>
+    <div class="mb-3 d-flex align-items-center gap-3">
+        <div>
+            <label for="yearSelect" class="form-label">Оберіть рік:</label>
+            <select id="yearSelect" class="form-select w-auto d-inline-block">
+                {% for y in range(2020, 2026) %}
+                    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <a href="/export/cartridge_movement_models?year={{ year }}" class="btn btn-excel">Експорт у Excel</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th class="fixed-column fixed-header">Модель картриджа</th>
+                    {% for month in ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру'] %}
+                        <th class="text-center fixed-header">{{ month }}</th>
+                    {% endfor %}
+                </tr>
+                <tr class="table-total">
+                    <td class="fixed-column fixed-total"><strong>Всього</strong></td>
+                    {% for month in range(1, 13) %}
+                        <td class="fixed-total"><strong>{{ totals[month|string].filled_sent or '—' }}</strong></td>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for model_id, model in models.items() %}
+                    <tr>
+                        <td class="fixed-column dept-name">{{ model.model_name }}</td>
+                        {% for month in range(1, 13) %}
+                            <td>{{ model.data[month|string].filled_sent or '—' }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .table-total {
+        background-color: #e9ecef;
+        font-weight: bold;
+    }
+    .btn-excel {
+        background-color: #1D6F42;
+        color: white;
+        border: none;
+    }
+    .btn-excel:hover {
+        background-color: #155932;
+        color: white;
+    }
+    .gap-3 {
+        gap: 1rem;
+    }
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+    }
+    .table-responsive {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 500px;
+        max-width: 100%;
+    }
+    .fixed-column {
+        position: sticky;
+        left: 0;
+        width: 200px; /* Фіксована ширина для всіх комірок у стовпці "Модель картриджа" */
+        min-width: 200px; /* Запобігає стисненню */
+        background: #fff;
+        z-index: 1;
+    }
+    .table-total .fixed-column {
+        background: #e9ecef;
+    }
+    .dept-name {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: normal;
+    }
+    th, td {
+        min-width: 70px;
+        text-align: center;
+    }
+    th.fixed-column, td.fixed-column {
+        text-align: left;
+    }
+    .fixed-header {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 2;
+    }
+    .fixed-total {
+        position: sticky;
+        top: 40px;
+        background: #e9ecef;
+        z-index: 2;
+    }
+</style>
+
+<script>
+    // Обробка зміни року
+    document.getElementById('yearSelect').addEventListener('change', function() {
+        window.location.href = '/cartridge_movement_models?year=' + this.value;
+    });
+
+    // Лоадер для експорту
+    document.querySelector('.btn.btn-excel').addEventListener('click', function(e) {
+        e.preventDefault();
+        const link = this.href;
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.className = 'loading-overlay';
+        loadingOverlay.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Завантажується...</span></div>';
+        document.querySelector('.container').appendChild(loadingOverlay);
+        window.location.href = link;
+        setTimeout(() => loadingOverlay.remove(), 2000);
+    });
+</script>
+{% endblock %}

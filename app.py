@@ -3,7 +3,7 @@ from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, Response, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
-from sqlalchemy import func, and_, asc, desc
+from sqlalchemy import func, and_, asc, desc, extract
 
 from datetime import datetime
 import bcrypt
@@ -1847,6 +1847,290 @@ def update_cartridge_barcodes():
 @login_required
 def test_cartridges():
     return render_template('testCartridge.html', RefillDept=RefillDept)
+
+
+#----------------------------------------------------------------
+@app.route('/api/get_cartridge_movement_all', methods=['GET'])
+@login_required
+def get_cartridge_movement_all():
+    # Параметри запиту: рік (опціонально, за замовчуванням поточний), dept_id (опціонально)
+    year = request.args.get('year', type=int, default=datetime.now().year)
+    dept_id = request.args.get('dept_id', type=int, default=None)
+
+    # Запит для підрахунку подій (статуси 2, 5) для відділів з is_exec != 1
+    query = (
+        db.session.query(
+            RefillDept.id.label('dept_id'),
+            RefillDept.deptname,
+            extract('month', CartridgeStatus.date_ofchange).label('month'),
+            func.count().label('event_count')
+        )
+        .join(RefillDept, RefillDept.id == CartridgeStatus.exec_dept)
+        .filter(
+            CartridgeStatus.status.in_([2, 5]),
+            extract('year', CartridgeStatus.date_ofchange) == year,
+            RefillDept.is_exec != 1
+        )
+    )
+
+    # Додаємо фільтр за dept_id, якщо вказано
+    if dept_id:
+        query = query.filter(RefillDept.id == dept_id)
+
+    query = query.group_by(
+        RefillDept.id,
+        RefillDept.deptname,
+        extract('month', CartridgeStatus.date_ofchange)
+    ).all()
+
+    # Формування результату
+    result = {}
+    totals = {str(i): {'filled_sent': 0} for i in range(1, 13)}
+    for dept_id, deptname, month, count in query:
+        if dept_id not in result:
+            result[dept_id] = {
+                'deptname': deptname,
+                'data': {str(i): {'filled_sent': 0} for i in range(1, 13)}
+            }
+        month_str = str(int(month))
+        result[dept_id]['data'][month_str]['filled_sent'] = count
+        totals[month_str]['filled_sent'] += count
+
+    # Видаляємо відділи без подій
+    result = {k: v for k, v in result.items() if any(
+        v['data'][str(m)]['filled_sent'] > 0
+        for m in range(1, 13)
+    )}
+
+    return jsonify({
+        'year': year,
+        'departments': result,
+        'totals': totals
+    })
+
+
+@app.route('/cartridge_movement_all', methods=['GET'])
+@login_required
+def cartridge_movement_all():
+    year = request.args.get('year', type=int, default=datetime.now().year)
+    dept_id = request.args.get('dept_id', type=int, default=None)
+    # Запит до API для отримання даних
+    response = get_cartridge_movement_all().get_json()
+    return render_template('cartridge_movement_all.html', RefillDept=RefillDept, year=year, dept_id=dept_id,
+                           departments=response['departments'], totals=response['totals'])
+
+
+@app.route('/export/cartridge_movement_all', methods=['GET'])
+@login_required
+def export_cartridge_movement_all():
+    year = request.args.get('year', type=int, default=datetime.now().year)
+    dept_id = request.args.get('dept_id', type=int, default=None)
+
+    # Отримуємо дані з API
+    response = get_cartridge_movement_all().get_json()
+    departments = response['departments']
+    totals = response['totals']
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Заправлені картриджі, що видані на відділи {year}"
+
+    # Заголовки: лише назви місяців
+    months = ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру']
+    ws.append(['Відділ'] + months)
+
+    # Дані по відділах
+    for dept_id, dept in departments.items():
+        row = [dept['deptname']]
+        for month in range(1, 13):
+            month_str = str(month)
+            row.append(dept['data'][month_str]['filled_sent'])
+        ws.append(row)
+
+    # Рядок "Всього"
+    total_row = ['Всього']
+    for month in range(1, 13):
+        month_str = str(month)
+        total_row.append(totals[month_str]['filled_sent'])
+    ws.append(total_row)
+
+    # Стилі для заголовків і рядка "Всього"
+    from openpyxl.styles import Font, Alignment, PatternFill
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    for cell in ws[ws.max_row]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл у пам’яті
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Формуємо назву файлу
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Заправлені_картриджі_що_видані_на_відділи_{year}_{timestamp}.xlsx"
+
+    return send_file(
+        output,
+        download_name=filename,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+#----------------------------------------------------------------
+
+@app.route('/api/get_cartridge_movement_models', methods=['GET'])
+@login_required
+def get_cartridge_movement_models():
+    # Параметри запиту: рік (опціонально, за замовчуванням поточний)
+    year = request.args.get('year', type=int, default=datetime.now().year)
+
+    # Запит для підрахунку подій (статуси 2, 5) для всіх моделей картриджів
+    query = (
+        db.session.query(
+            CartridgeModel.id.label('model_id'),
+            CartridgeModel.model_name,
+            extract('month', CartridgeStatus.date_ofchange).label('month'),
+            func.count().label('event_count')
+        )
+        .join(Cartridges, Cartridges.cartrg_model_id == CartridgeModel.id)
+        .join(CartridgeStatus, CartridgeStatus.cartridge_id == Cartridges.id)
+        .filter(
+            CartridgeStatus.status.in_([2, 5]),
+            extract('year', CartridgeStatus.date_ofchange) == year
+        )
+        .group_by(
+            CartridgeModel.id,
+            CartridgeModel.model_name,
+            extract('month', CartridgeStatus.date_ofchange)
+        )
+    ).all()
+
+    # Отримуємо всі моделі картриджів
+    all_models = CartridgeModel.query.order_by(CartridgeModel.model_name).all()
+
+    # Формування результату
+    result = {}
+    totals = {str(i): {'filled_sent': 0} for i in range(1, 13)}
+
+    # Ініціалізація всіх моделей у result
+    for model in all_models:
+        result[model.id] = {
+            'model_name': model.model_name,
+            'data': {str(i): {'filled_sent': 0} for i in range(1, 13)}
+        }
+
+    # Заповнення даними з query
+    for model_id, model_name, month, count in query:
+        month_str = str(int(month))
+        result[model_id]['data'][month_str]['filled_sent'] = count
+        totals[month_str]['filled_sent'] += count
+
+    return jsonify({
+        'year': year,
+        'models': result,
+        'totals': totals
+    })
+
+@app.route('/cartridge_movement_models', methods=['GET'])
+@login_required
+def cartridge_movement_models():
+    year = request.args.get('year', type=int, default=datetime.now().year)
+    # Запит до API для отримання даних
+    response = get_cartridge_movement_models().get_json()
+    return render_template('cartridge_movement_models.html',
+                           CartridgeModel=CartridgeModel,
+                           year=year,
+                           models=response['models'],
+                           totals=response['totals'])
+
+@app.route('/export/cartridge_movement_models', methods=['GET'])
+@login_required
+def export_cartridge_movement_models():
+    year = request.args.get('year', type=int, default=datetime.now().year)
+
+    # Отримуємо дані з API
+    response = get_cartridge_movement_models().get_json()
+    models = response['models']
+    totals = response['totals']
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Заправлені картриджі за моделями {year}"
+
+    # Заголовки: лише назви місяців
+    months = ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру']
+    ws.append(['Модель картриджа'] + months)
+
+    # Дані по моделях
+    for model_id, model in models.items():
+        row = [model['model_name']]
+        for month in range(1, 13):
+            month_str = str(month)
+            row.append(model['data'][month_str]['filled_sent'])
+        ws.append(row)
+
+    # Рядок "Всього"
+    total_row = ['Всього']
+    for month in range(1, 13):
+        month_str = str(month)
+        total_row.append(totals[month_str]['filled_sent'])
+    ws.append(total_row)
+
+    # Стилі для заголовків і рядка "Всього"
+    from openpyxl.styles import Font, Alignment, PatternFill
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    for cell in ws[ws.max_row]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл у пам’яті
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Формуємо назву файлу
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Заправлені_картриджі_за_моделями_{year}_{timestamp}.xlsx"
+
+    return send_file(
+        output,
+        download_name=filename,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+
 
 
 if __name__ == '__main__':
