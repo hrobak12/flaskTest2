@@ -17,7 +17,7 @@ from barcode import Code128
 from barcode.writer import ImageWriter
 from transliterate import translit
 
-from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel
+from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel, CompatibleCartridges
 from config import status_map
 
 app = Flask(__name__)
@@ -52,6 +52,10 @@ def admin_required(f):
 
 #*************
 #тут може бути скрипт міграції, якщо потрібно
+
+#with app.app_context():
+#    db.create_all()
+
 #*************
 
 
@@ -2130,6 +2134,112 @@ def export_cartridge_movement_models():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
+#-------------------------------------------
+# Існуючий ендпоінт для отримання моделей принтерів
+@app.route('/api/printer_models', methods=['GET'])
+@login_required
+def get_printer_models():
+    printers = PrinterModel.query.all()
+    return jsonify([{'id': p.id, 'model_name': p.model_name} for p in printers])
+
+
+# Отримання доступних і сумісних картриджів
+@app.route('/api/compatible_cartridges/<int:printer_model_id>', methods=['GET'])
+@login_required
+def get_compatible_cartridges(printer_model_id):
+    # Перевірка існування моделі принтера
+    if not PrinterModel.query.get(printer_model_id):
+        return jsonify({'error': 'Printer model not found'}), 404
+
+    compatible = CompatibleCartridges.query.filter_by(printer_model_id=printer_model_id).all()
+    compatible_ids = {c.cartridge_model_id for c in compatible}
+    all_cartridges = CartridgeModel.query.all()
+
+    available = [{'id': c.id, 'model_name': c.model_name} for c in all_cartridges if c.id not in compatible_ids]
+    compatible_data = []
+    for c in compatible:
+        cartridge = CartridgeModel.query.get(c.cartridge_model_id)
+        if cartridge:
+            compatible_data.append({
+                'id': c.cartridge_model_id,
+                'model_name': cartridge.model_name,
+                'notes': c.notes
+            })
+
+    return jsonify({'available': available, 'compatible': compatible_data})
+
+
+# Оновлення зв’язків сумісності
+@app.route('/api/compatible_cartridges/<int:printer_model_id>', methods=['POST'])
+@login_required
+@admin_required
+def update_compatible_cartridges(printer_model_id):
+    if not PrinterModel.query.get(printer_model_id):
+        return jsonify({'error': 'Printer model not found'}), 404
+
+    data = request.json
+    cartridges = data.get('cartridges', [])
+
+    CompatibleCartridges.query.filter_by(printer_model_id=printer_model_id).delete()
+
+    for item in cartridges:
+        cartridge_model_id = item.get('cartridge_model_id')
+        if not CartridgeModel.query.get(cartridge_model_id):
+            db.session.rollback()
+            return jsonify({'error': f'Cartridge model {cartridge_model_id} not found'}), 404
+
+        new_link = CompatibleCartridges(
+            printer_model_id=printer_model_id,
+            cartridge_model_id=cartridge_model_id,
+            user_updated=current_user.id,
+            time_updated=datetime.utcnow(),
+            notes=item.get('notes')
+        )
+        db.session.add(new_link)
+
+    event = EventLog(
+        table_name='compat_cartridges',
+        event_type=2,
+        user_updated=current_user.id
+    )
+    db.session.add(event)
+
+    try:
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+# Видалення конкретного зв’язку
+@app.route('/api/compatible_cartridges/<int:printer_model_id>/<int:cartridge_model_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_compatible_cartridge(printer_model_id, cartridge_model_id):
+    link = CompatibleCartridges.query.filter_by(
+        printer_model_id=printer_model_id,
+        cartridge_model_id=cartridge_model_id
+    ).first()
+
+    if not link:
+        return jsonify({'error': 'Compatibility link not found'}), 404
+
+    db.session.delete(link)
+
+    event = EventLog(
+        table_name='compat_cartridges',
+        event_type=3,
+        user_updated=current_user.id
+    )
+    db.session.add(event)
+
+    try:
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 

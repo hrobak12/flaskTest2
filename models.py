@@ -93,6 +93,20 @@ class CartridgeStatus(db.Model):
         Index('idx_exec_dept', 'exec_dept'),                           # Окремий індекс для exec_dept
     )
 
+class CompatibleCartridges(db.Model):
+    __tablename__ = "compat_cartridges"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    printer_model_id: Mapped[int] = mapped_column(ForeignKey('model_print.id'), nullable=False)
+    cartridge_model_id: Mapped[int] = mapped_column(ForeignKey('cartrg_model.id'), nullable=False)
+    notes: Mapped[str] = mapped_column(String(255), nullable=True)
+    user_updated: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
+    __table_args__ = (
+        Index('idx_printer_model', 'printer_model_id'),
+        Index('idx_cartridge_model', 'cartridge_model_id'),
+        db.UniqueConstraint('printer_model_id', 'cartridge_model_id', name='uniq_printer_cartridge'),
+    )
+
 class EventLog(db.Model):
     __tablename__ = "event_log"
     id: Mapped[int] = mapped_column(primary_key=True)
