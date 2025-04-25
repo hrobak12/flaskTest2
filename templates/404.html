@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Ой! Картридж не знайдено{% endblock %}
+{% block content %}
+<style>
+    .error-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 60vh;
+        text-align: center;
+        padding: 20px;
+    }
+    .error-title {
+        font-size: 3rem;
+        color: #dc3545; /* Червоний Bootstrap */
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-transform: uppercase;
+    }
+    .error-message {
+        font-size: 1.25rem;
+        color: #333;
+        margin-bottom: 30px;
+        line-height: 1.5;
+    }
+
+    .cartridge {
+        font-size: 80px;
+        margin-bottom: 20px;
+        animation: flicker 1.5s infinite;
+    }
+
+    .printer-image {
+        width: 120px;
+        height: auto;
+        margin-bottom: 20px;
+        animation: flicker 1.5s infinite;
+    }
+    @keyframes flicker {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    .btn-home {
+        background-color: #007bff; /* Синій Bootstrap */
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        text-decoration: none;
+        transition: background-color 0.3s;
+    }
+    .btn-home:hover {
+        background-color: #0056b3; /* Темніший синій */
+        color: white;
+    }
+</style>
+<div class="error-container">
+    <div class="cartridge">🖨️</div>
+    <h1 class="error-title">Ой! 404</h1>
+    <p class="error-message">
+        Сторінка не надрукувалась, бо картридж закінчився або загубився в принтері!<br>
+        Спробуйте повернутися на головну сторінку.
+    </p>
+    <a href="{{ url_for('index') }}" class="btn-home">Повернутися на головну</a>
+</div>
+{% endblock %}

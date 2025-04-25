@@ -53,8 +53,8 @@ def admin_required(f):
 #*************
 #тут може бути скрипт міграції, якщо потрібно
 
-#with app.app_context():
-#    db.create_all()
+with app.app_context():
+    db.create_all()
 
 #*************
 
@@ -2264,7 +2264,8 @@ def cartridge_distribution_by_dept():
         .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)
         .join(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)
         .filter(
-            CartridgeStatus.status == 2,  # Припускаємо, що status=2 означає "Видано"
+#            CartridgeStatus.status == 2,  # Припускаємо, що status=2 означає "Видано"
+            CartridgeStatus.status.in_([2, 5]),
             extract('year', CartridgeStatus.date_ofchange) == year,
             extract('month', CartridgeStatus.date_ofchange) == month
         )
@@ -2315,7 +2316,8 @@ def export_cartridge_distribution_by_dept():
         .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)
         .join(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)
         .filter(
-            CartridgeStatus.status == 2,
+#            CartridgeStatus.status == 2,
+            CartridgeStatus.status.in_([2, 5]),
             extract('year', CartridgeStatus.date_ofchange) == year,
             extract('month', CartridgeStatus.date_ofchange) == month
         )
@@ -2380,6 +2382,9 @@ def export_cartridge_distribution_by_dept():
         download_name=f'cartridge_distribution_{year}_{month:02d}.xlsx'
     )
 
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
