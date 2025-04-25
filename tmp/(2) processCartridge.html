@@ -2,64 +2,6 @@
 {% block title %}Обробка картриджів{% endblock %}
 {% block content %}
 <h1>Обробка картриджів</h1>
-<h2><a href="#" class="process-link" onclick="processModal.show(); return false;">Натисніть сюди</a> або F2 для обробки картриджів</h2>
-
-<!-- Модальне вікно для обробки -->
-<div class="modal fade" id="processModal" tabindex="-1" aria-labelledby="processModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-secondary text-white">
-                <h5 class="modal-title" id="processModalLabel">Приймання або відправка картриджа</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="processForm">
-                    <div class="mb-3 position-relative">
-                        <label for="serial_num" class="form-label">Серійний номер</label>
-                        <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Введіть або відскануйте" required autofocus>
-                        <div id="serial-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="status" class="form-label">Статус</label>
-                        <select class="form-select" id="status" name="status" required>
-                            <option value="0">Не вказано</option>
-                            <option value="1">На зберіганні (порожній)</option>
-                            <option value="2">Відправлено в користування</option>
-                            <option value="3">Відправлено на заправку</option>
-                            <option value="4">Непридатний (списаний)</option>
-                            <option value="5">Одноразовий (фарба у банці)</option>
-                            <option value="6">На зберіганні (заправлений)</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="exec_dept" class="form-label">Відділ</label>
-                        <select class="form-select" id="exec_dept" name="exec_dept" required>
-                            <option value="">Виберіть відділ</option>
-                            {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
-                                <option value="{{ dept.id }}">{{ dept.deptname }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="printer" class="form-label">Принтер</label>
-                        <select class="form-select" id="printer" name="printer" disabled>
-                            <option value="">Спочатку виберіть відділ</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="parcel_track" class="form-label">Трек-номер (необов’язково)</label>
-                        <input type="text" class="form-control" id="parcel_track" name="parcel_track" maxlength="13" placeholder="Трек-номер">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-ukrposhta me-auto" id="printLabelBtn">Друкувати ярлик</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
-                <button type="button" class="btn btn-primary" id="confirmProcess">Підтвердити</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Модальне вікно для історії дій -->
 <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
@@ -257,14 +199,6 @@
     .serial-link:hover {
         color: #0056b3;
     }
-    .process-link {
-        color: #007bff;
-        text-decoration: underline;
-        cursor: pointer;
-    }
-    .process-link:hover {
-        color: #0056b3;
-    }
     .btn-excel {
         background-color: #1D6F42;
         color: white;
@@ -336,187 +270,15 @@
         fetchInStorageCartridges();
     });
 
-    const serialInput = document.getElementById('serial_num');
-    const suggestionsDropdown = document.getElementById('serial-suggestions');
-    const execDeptSelect = document.getElementById('exec_dept');
-    const printerSelect = document.getElementById('printer');
-    const statusSelect = document.getElementById('status');
     const barcodeModal = new bootstrap.Modal(document.getElementById('barcodeModal'));
     const barcodeInput = document.getElementById('barcode');
     const barcodeTableBody = document.getElementById('barcode-table-body');
     const noCartridgesMessage = document.getElementById('no-cartridges-message');
     const toggleSelectAllBtn = document.getElementById('toggleSelectAll');
 
-    let selectedIndex = -1;
-
     // Ініціалізація модальних вікон
-    const processModal = new bootstrap.Modal(document.getElementById('processModal'));
     const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
     const printLabelModal = new bootstrap.Modal(document.getElementById('printLabelModal'));
-
-    // Обробка введення серійного номера
-    serialInput.addEventListener('input', debounce((e) => {
-        const query = e.target.value.trim();
-        if (query.length >= 2) {
-            fetch(`/api/cartridges?search=${encodeURIComponent(query)}`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => response.json())
-            .then(data => updateSuggestions(data.cartridges))
-            .catch(error => console.error('Помилка:', error));
-        } else {
-            suggestionsDropdown.innerHTML = '';
-            suggestionsDropdown.classList.remove('show');
-        }
-    }, 300));
-
-    // Обробка клавіатури для навігації по пропозиціях
-    serialInput.addEventListener('keydown', (e) => {
-        const items = suggestionsDropdown.querySelectorAll('.dropdown-item');
-        if (items.length === 0) return;
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-            updateSelection(items);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            selectedIndex = Math.max(selectedIndex - 1, -1);
-            updateSelection(items);
-        } else if (e.key === 'Enter' && selectedIndex >= 0) {
-            e.preventDefault();
-            items[selectedIndex].click();
-        }
-    });
-
-    // Оновлення пропозицій у dropdown
-    function updateSuggestions(cartridges) {
-        suggestionsDropdown.innerHTML = '';
-        selectedIndex = -1;
-        if (cartridges.length > 0) {
-            cartridges.forEach(cartridge => {
-                const item = document.createElement('a');
-                item.classList.add('dropdown-item');
-                item.href = '#';
-                item.textContent = `${cartridge.serial_num} (${cartridge.cartridge_model || 'Без моделі'})`;
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    serialInput.value = cartridge.serial_num;
-                    suggestionsDropdown.innerHTML = '';
-                    suggestionsDropdown.classList.remove('show');
-                    triggerBlurEvent();
-                });
-                suggestionsDropdown.appendChild(item);
-            });
-            suggestionsDropdown.classList.add('show');
-        } else {
-            suggestionsDropdown.classList.remove('show');
-        }
-    }
-
-    // Оновлення виділення в dropdown
-    function updateSelection(items) {
-        items.forEach((item, index) => {
-            item.classList.toggle('active', index === selectedIndex);
-        });
-        if (selectedIndex >= 0) {
-            items[selectedIndex].scrollIntoView({ block: 'nearest' });
-        }
-    }
-
-    // Debounce-функція
-    function debounce(func, wait) {
-        let timeout;
-        return function (...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    }
-
-    // Обробка blur для serial_num
-    serialInput.addEventListener('blur', (e) => {
-        const serialNum = e.target.value.trim();
-        if (serialNum) {
-            let isModalOpen = processModal._isShown;
-            fetch('/check_cartridge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serial_num: serialNum })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (isModalOpen) {
-                    if (data.success && data.latest_status) {
-                        document.getElementById('status').value = data.latest_status.status || '0';
-                        document.getElementById('exec_dept').value = data.latest_status.exec_dept || '';
-                        document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
-                    } else {
-                        const label = document.querySelector('label[for="serial_num"]');
-                        label.classList.add('double-blink');
-                        setTimeout(() => label.classList.remove('double-blink'), 1200);
-                        document.getElementById('serial_num').focus();
-                        document.getElementById('serial_num').select();
-                    }
-                }
-            })
-            .catch(error => {
-                if (isModalOpen) {
-                    const label = document.querySelector('label[for="serial_num"]');
-                    label.classList.add('double-blink');
-                    setTimeout(() => label.classList.remove('double-blink'), 1200);
-                    document.getElementById('serial_num').focus();
-                    document.getElementById('serial_num').select();
-                }
-            });
-        }
-    });
-
-    // Програмний blur
-    function triggerBlurEvent() {
-        const event = new Event('blur');
-        serialInput.dispatchEvent(event);
-    }
-
-    // Завантаження принтерів
-    execDeptSelect.addEventListener('change', () => {
-        const deptId = execDeptSelect.value;
-        if (deptId) {
-            fetch(`/api/printers_by_dept/${deptId}`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                printerSelect.innerHTML = '<option value="">Виберіть принтер (необов’язково)</option>';
-                data.printers.forEach(printer => {
-                    const option = document.createElement('option');
-                    option.value = printer.id;
-                    option.textContent = printer.model_name;
-                    printerSelect.appendChild(option);
-                });
-                printerSelect.disabled = false;
-            })
-            .catch(error => {
-                console.error('Помилка завантаження принтерів:', error);
-                printerSelect.innerHTML = '<option value="">Помилка завантаження</option>';
-                printerSelect.disabled = true;
-            });
-        } else {
-            printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
-            printerSelect.disabled = true;
-        }
-    });
-
-    // Очищення форми
-    document.getElementById('processModal').addEventListener('hidden.bs.modal', () => {
-        processModal._isShown = false;
-        suggestionsDropdown.innerHTML = '';
-        suggestionsDropdown.classList.remove('show');
-        document.getElementById('processForm').reset();
-        printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
-        printerSelect.disabled = true;
-    });
 
     // Завантаження картриджів "В дорозі"
     function fetchInTransitCartridges() {
@@ -701,72 +463,6 @@
             `;
             tbody.appendChild(collapseRow);
         });
-    }
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'F2') {
-            e.preventDefault();
-            processModal.show();
-        }
-    });
-
-    document.getElementById('processModal').addEventListener('shown.bs.modal', () => {
-        document.getElementById('serial_num').focus();
-    });
-
-    document.getElementById('processModal').addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') processModal.hide();
-    });
-
-    document.getElementById('confirmProcess').addEventListener('click', submitForm);
-    document.getElementById('processForm').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            submitForm();
-        }
-    });
-
-    // Друкування ярлика
-    document.getElementById('printLabelBtn').addEventListener('click', () => {
-        const deptId = document.getElementById('exec_dept').value;
-        if (deptId) {
-            const url = `/generate_shipping_label/${deptId}`;
-            window.open(url, '_blank');
-        } else {
-            alert('Будь ласка, виберіть відділ!');
-        }
-    });
-
-    // Відправка форми
-    function submitForm() {
-        const formData = new FormData(document.getElementById('processForm'));
-        fetch('/add_cartridge_event', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Подію додано!');
-                processModal.hide();
-                document.getElementById('processForm').reset();
-                fetchInTransitCartridges();
-                fetchInStorageCartridges();
-                if (window.location.pathname === '/cartridges') {
-                    fetchCartridges(document.getElementById('search').value.trim(), 1);
-                }
-            } else {
-                if (data.message === 'Цей статус уже встановлено для картриджа!') {
-                    const statusLabel = document.querySelector('label[for="status"]');
-                    statusLabel.classList.add('double-blink');
-                    setTimeout(() => statusLabel.classList.remove('double-blink'), 1200);
-                    statusSelect.focus();
-                } else {
-                    alert('Помилка: ' + data.message);
-                }
-            }
-        })
-        .catch(error => alert('Помилка при відправці: ' + error));
     }
 
     // Показ історії

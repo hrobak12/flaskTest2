@@ -5,7 +5,7 @@
 
 <div class="row mt-4">
     <!-- Секція Видача -->
-    <div class="col-md-6">
+    <div class="col-md-4">
         <h3>Видача картриджів</h3>
         <div class="card p-3 mb-3">
             <button class="btn btn-primary mb-2" onclick="openMassModal('issue_filled', 2)">Видача заправлених (на відділи)</button>
@@ -13,16 +13,23 @@
         </div>
     </div>
     <!-- Секція Прийом -->
-    <div class="col-md-6">
+    <div class="col-md-4">
         <h3>Прийом картриджів</h3>
         <div class="card p-3 mb-3">
             <button class="btn btn-success mb-2" onclick="openMassModal('receive_filled', 6)">Прийом заправлених (із заправки)</button>
             <button class="btn btn-secondary" onclick="openMassModal('receive_empty', 1)">Прийом порожніх (на заправку)</button>
         </div>
     </div>
+    <!-- Секція Індивідуальна обробка -->
+    <div class="col-md-4">
+        <h3>Індивідуальна обробка</h3>
+        <div class="card p-3 mb-3">
+            <button class="btn btn-info" onclick="openMassModal('single_process', null)">Приймання або відправка картриджа</button>
+        </div>
+    </div>
 </div>
 
-<!-- Модальне вікно для масового введення -->
+<!-- Модальне вікно для масового введення та індивідуальної обробки -->
 <div class="modal fade" id="massInputModal" tabindex="-1" aria-labelledby="massInputModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -39,7 +46,19 @@
                         <input type="text" class="form-control" id="serial_num" name="serial_num" placeholder="Серійний номер" required autofocus>
                         <div id="serial-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
                     </div>
-                    <div class="card">
+                    <div class="mb-3" id="status_field" style="display: none;">
+                        <label for="status_select" class="form-label">Статус</label>
+                        <select class="form-select" id="status_select" name="status_select">
+                            <option value="0">Не вказано</option>
+                            <option value="1">На зберіганні (порожній)</option>
+                            <option value="2">Відправлено в користування</option>
+                            <option value="3">Відправлено на заправку</option>
+                            <option value="4">Непридатний (списаний)</option>
+                            <option value="5">Одноразовий (фарба у банці)</option>
+                            <option value="6">На зберіганні (заправлений)</option>
+                        </select>
+                    </div>
+                    <div class="card" id="cartridge_table" style="display: none;">
                         <div class="card-body p-0">
                             <div style="max-height: 300px; overflow-y: auto;">
                                 <table class="table table-striped mb-0" id="mass-input-table">
@@ -62,6 +81,9 @@
                         <label for="exec_dept" class="form-label">Відділ</label>
                         <select class="form-select" id="exec_dept" name="exec_dept" required>
                             <option value="">Виберіть відділ</option>
+                            {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
+                                <option value="{{ dept.id }}">{{ dept.deptname }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="mt-3" id="printer_field" style="display: none;">
@@ -90,6 +112,7 @@
     .btn-warning { background-color: #ffc107; border-color: #ffc107; color: #000; }
     .btn-success { background-color: #28a745; border-color: #28a745; }
     .btn-secondary { background-color: #6c757d; border-color: #6c757d; }
+    .btn-info { background-color: #17a2b8; border-color: #17a2b8; }
     .btn-ukrposhta {
         background-color: #FFC107; /* Жовтий фон, як у Укрпошти */
         border-color: #FFC107;
@@ -135,6 +158,13 @@
         white-space: normal;
         overflow-x: hidden;
     }
+    .double-blink {
+        animation: double-blink 0.4s step-end 2;
+    }
+    @keyframes double-blink {
+        0%, 50% { color: red; }
+        25%, 75%, 100% { color: inherit; }
+    }
 </style>
 {% endblock %}
 
@@ -148,7 +178,10 @@
     const printerSelect = document.getElementById('printer');
     const parcelTrackField = document.getElementById('parcel_track_field');
     const printerField = document.getElementById('printer_field');
+    const statusField = document.getElementById('status_field');
+    const cartridgeTable = document.getElementById('cartridge_table');
     const printLabelBtn = document.getElementById('printLabelBtn');
+    const statusSelect = document.getElementById('status_select');
 
     let cartridges = [];
     let currentOperation = '';
@@ -162,7 +195,7 @@
     fetch('/api/departments')
         .then(response => response.json())
         .then(data => {
-            allDepts = data.departments; // Очікуємо формат: [{id, deptname, is_exec}, ...]
+            allDepts = data.departments; // Очікуємо формат: [{id  id, deptname, is_exec}, ...]
         })
         .catch(error => console.error('Помилка завантаження відділів:', error));
 
@@ -171,13 +204,15 @@
         currentOperation = operation;
         currentStatus = status;
         document.getElementById('operation_type').value = operation;
-        document.getElementById('status').value = status;
+        document.getElementById('status').value = status || '';
         document.getElementById('massInputModalLabel').textContent = getModalTitle(operation);
 
         // Налаштування полів
-        parcelTrackField.style.display = (operation === 'issue_empty') ? 'block' : 'none';
-        printerField.style.display = (operation === 'issue_filled') ? 'block' : 'none';
-        printLabelBtn.style.display = (operation === 'issue_empty') ? 'inline-block' : 'none';
+        parcelTrackField.style.display = (operation === 'issue_empty' || operation === 'single_process') ? 'block' : 'none';
+        printerField.style.display = (operation === 'issue_filled' || operation === 'single_process') ? 'block' : 'none';
+        statusField.style.display = (operation === 'single_process') ? 'block' : 'none';
+        cartridgeTable.style.display = (operation !== 'single_process') ? 'block' : 'none';
+        printLabelBtn.style.display = (operation === 'issue_empty' || operation === 'single_process') ? 'inline-block' : 'none';
 
         // Очищення
         cartridges = [];
@@ -212,6 +247,7 @@
             case 'issue_empty': return 'Видача порожніх картриджів на заправку';
             case 'receive_filled': return 'Прийом заправлених картриджів';
             case 'receive_empty': return 'Прийом порожніх картриджів';
+            case 'single_process': return 'Приймання або відправка картриджа';
             default: return 'Масова обробка картриджів';
         }
     }
@@ -231,6 +267,8 @@
         selectedIndex = -1;
         printerField.style.display = 'none';
         parcelTrackField.style.display = 'none';
+        statusField.style.display = 'none';
+        cartridgeTable.style.display = 'none';
         printLabelBtn.style.display = 'none';
         printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
         printerSelect.disabled = true;
@@ -260,7 +298,11 @@
             } else {
                 const serialNum = serialInput.value.trim();
                 if (serialNum) {
-                    fetchCartridgeDetails(serialNum);
+                    if (currentOperation === 'single_process') {
+                        triggerBlurEvent();
+                    } else {
+                        fetchCartridgeDetails(serialNum);
+                    }
                 }
             }
         } else if (items.length > 0) {
@@ -291,7 +333,11 @@
                     serialInput.value = cartridge.serial_num;
                     suggestionsDropdown.innerHTML = '';
                     suggestionsDropdown.classList.remove('show');
-                    fetchCartridgeDetails(cartridge.serial_num);
+                    if (currentOperation === 'single_process') {
+                        triggerBlurEvent();
+                    } else {
+                        fetchCartridgeDetails(cartridge.serial_num);
+                    }
                 });
                 suggestionsDropdown.appendChild(item);
             });
@@ -310,7 +356,8 @@
             items[selectedIndex].scrollIntoView({ block: 'nearest' });
         }
     }
-        // Отримання деталей картриджа
+
+    // Отримання деталей картриджа (для масового введення)
     function fetchCartridgeDetails(serialNum) {
         fetch(`/api/cartridges?search=${encodeURIComponent(serialNum)}`)
             .then(response => response.json())
@@ -343,7 +390,7 @@
             });
     }
 
-    // Оновлення таблиці
+    // Оновлення таблиці (для масового введення)
     function updateTable() {
         tableBody.innerHTML = '';
         cartridges.forEach((cartridge, index) => {
@@ -368,7 +415,7 @@
     // Завантаження принтерів
     execDeptSelect.addEventListener('change', () => {
         const deptId = execDeptSelect.value;
-        if (deptId && currentOperation === 'issue_filled') {
+        if (deptId && (currentOperation === 'issue_filled' || currentOperation === 'single_process')) {
             fetch(`/api/printers_by_dept/${deptId}`)
                 .then(response => response.json())
                 .then(data => {
@@ -392,9 +439,54 @@
         }
     });
 
+    // Обробка blur для serial_num (для single_process)
+    serialInput.addEventListener('blur', (e) => {
+        if (currentOperation !== 'single_process') return;
+        const serialNum = e.target.value.trim();
+        if (serialNum) {
+            let isModalOpen = massInputModal._isShown;
+            fetch('/check_cartridge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serial_num: serialNum })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (isModalOpen) {
+                    if (data.success && data.latest_status) {
+                        statusSelect.value = data.latest_status.status || '0';
+                        execDeptSelect.value = data.latest_status.exec_dept || '';
+                        document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
+                    } else {
+                        const label = document.querySelector('label[for="serial_num"]');
+                        label.classList.add('double-blink');
+                        setTimeout(() => label.classList.remove('double-blink'), 1200);
+                        serialInput.focus();
+                        serialInput.select();
+                    }
+                }
+            })
+            .catch(error => {
+                if (isModalOpen) {
+                    const label = document.querySelector('label[for="serial_num"]');
+                    label.classList.add('double-blink');
+                    setTimeout(() => label.classList.remove('double-blink'), 1200);
+                    serialInput.focus();
+                    serialInput.select();
+                }
+            });
+        }
+    });
+
+    // Програмний blur
+    function triggerBlurEvent() {
+        const event = new Event('blur');
+        serialInput.dispatchEvent(event);
+    }
+
     // Відправка форми
     document.getElementById('confirmMassInput').addEventListener('click', () => {
-        if (cartridges.length === 0) {
+        if (currentOperation !== 'single_process' && cartridges.length === 0) {
             alert('Додайте хоча б один картридж!');
             return;
         }
@@ -402,31 +494,60 @@
             alert('Виберіть відділ!');
             return;
         }
+        if (currentOperation === 'single_process' && !serialInput.value.trim()) {
+            alert('Введіть серійний номер!');
+            return;
+        }
         if (confirm('Ви впевнені?')) {
-            const formData = {
-                exec_dept: execDeptSelect.value,
-                status: currentStatus,
-                serial_nums: cartridges.map(c => c.serial_num),
-                parcel_track: document.getElementById('parcel_track')?.value || '',
-                printer: printerSelect.value || ''
-            };
-
-            fetch('/mass_add_cartridge_events', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            })
-            .then(response => response.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `mass_${currentOperation}_report.pdf`;
-                a.click();
-                window.URL.revokeObjectURL(url);
-                massInputModal.hide();
-            })
-            .catch(error => alert('Помилка: ' + error));
+            if (currentOperation === 'single_process') {
+                const formData = new FormData(document.getElementById('massInputForm'));
+                formData.set('status', statusSelect.value);
+                fetch('/add_cartridge_event', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Подію додано!');
+                        massInputModal.hide();
+                    } else {
+                        if (data.message === 'Цей статус уже встановлено для картриджа!') {
+                            const statusLabel = document.querySelector('label[for="status_select"]');
+                            statusLabel.classList.add('double-blink');
+                            setTimeout(() => statusLabel.classList.remove('double-blink'), 1200);
+                            statusSelect.focus();
+                        } else {
+                            alert('Помилка: ' + data.message);
+                        }
+                    }
+                })
+                .catch(error => alert('Помилка при відправці: ' + error));
+            } else {
+                const formData = {
+                    exec_dept: execDeptSelect.value,
+                    status: currentStatus,
+                    serial_nums: cartridges.map(c => c.serial_num),
+                    parcel_track: document.getElementById('parcel_track')?.value || '',
+                    printer: printerSelect.value || ''
+                };
+                fetch('/mass_add_cartridge_events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `mass_${currentOperation}_report.pdf`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    massInputModal.hide();
+                })
+                .catch(error => alert('Помилка: ' + error));
+            }
         }
     });
 
@@ -448,18 +569,5 @@
             timeout = setTimeout(() => func.apply(this, args), wait);
         };
     }
-
-    // Стиль для мигання
-    const styleSheet = document.createElement('style');
-    styleSheet.innerHTML = `
-        .double-blink {
-            animation: double-blink 0.4s step-end 2;
-        }
-        @keyframes double-blink {
-            0%, 50% { color: red; }
-            25%, 75%, 100% { color: inherit; }
-        }
-    `;
-    document.head.appendChild(styleSheet);
 </script>
 {% endblock %}

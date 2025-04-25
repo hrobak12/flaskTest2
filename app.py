@@ -663,10 +663,11 @@ def delete_cartridge_model(model_id):
 
 
 #**************************робота з картриджами**************************
-@app.route('/processCartridge')
-@login_required
-def processCartridge():
-    return render_template('processCartridge.html', user=current_user, RefillDept=RefillDept)
+#DEPRECATED. Застаріле.
+#@app.route('/processCartridge')
+#@login_required
+#def processCartridge():
+#    return render_template('processCartridge.html', user=current_user, RefillDept=RefillDept)
 
 @app.route('/add_cartridge_event', methods=['POST'])
 @login_required
@@ -2240,7 +2241,144 @@ def delete_compatible_cartridge(printer_model_id, cartridge_model_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+#------------------------------------------------------
+@app.route('/cartridge_distribution_by_dept', methods=['GET'])
+@login_required
+def cartridge_distribution_by_dept():
+    # Отримуємо рік і місяць з параметрів запиту або встановлюємо поточні
+    year = int(request.args.get('year', datetime.now().year))
+    month = int(request.args.get('month', datetime.now().month))
 
+    # Отримуємо всі моделі картриджів
+    cartridge_models = CartridgeModel.query.all()
+
+    # Запит для отримання даних: кількість картриджів за моделями та підрозділами
+    results = (
+        db.session.query(
+            RefillDept.id.label('dept_id'),
+            RefillDept.deptname.label('dept_name'),
+            CartridgeModel.id.label('model_id'),
+            func.count().label('count')
+        )
+        .join(CartridgeStatus, CartridgeStatus.exec_dept == RefillDept.id)
+        .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)
+        .join(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)
+        .filter(
+            CartridgeStatus.status == 2,  # Припускаємо, що status=2 означає "Видано"
+            extract('year', CartridgeStatus.date_ofchange) == year,
+            extract('month', CartridgeStatus.date_ofchange) == month
+        )
+        .group_by(RefillDept.id, RefillDept.deptname, CartridgeModel.id)
+        .all()
+    )
+
+    # Організація даних для шаблону
+    departments = {}
+    totals = {}
+    for result in results:
+        dept_id = str(result.dept_id)
+        model_id = str(result.model_id)
+        if dept_id not in departments:
+            departments[dept_id] = {
+                'dept_name': result.dept_name,
+                'data': {}
+            }
+        departments[dept_id]['data'][model_id] = result.count
+        totals[model_id] = totals.get(model_id, 0) + result.count
+
+    return render_template(
+        'cartridge_distribution_by_dept.html',
+        year=year,
+        month=month,
+        cartridge_models=cartridge_models,
+        departments=departments,
+        totals=totals
+    )
+
+@app.route('/export/cartridge_distribution_by_dept', methods=['GET'])
+@login_required
+def export_cartridge_distribution_by_dept():
+    year = int(request.args.get('year', datetime.now().year))
+    month = int(request.args.get('month', datetime.now().month))
+
+    # Отримуємо дані (аналогічно до основного ендпоінту)
+    cartridge_models = CartridgeModel.query.all()
+    results = (
+        db.session.query(
+            RefillDept.id.label('dept_id'),
+            RefillDept.deptname.label('dept_name'),
+            CartridgeModel.id.label('model_id'),
+            CartridgeModel.model_name.label('model_name'),
+            func.count().label('count')
+        )
+        .join(CartridgeStatus, CartridgeStatus.exec_dept == RefillDept.id)
+        .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)
+        .join(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)
+        .filter(
+            CartridgeStatus.status == 2,
+            extract('year', CartridgeStatus.date_ofchange) == year,
+            extract('month', CartridgeStatus.date_ofchange) == month
+        )
+        .group_by(RefillDept.id, RefillDept.deptname, CartridgeModel.id, CartridgeModel.model_name)
+        .all()
+    )
+
+    # Організація даних
+    departments = {}
+    totals = {}
+    for result in results:
+        dept_id = str(result.dept_id)
+        model_id = str(result.model_id)
+        if dept_id not in departments:
+            departments[dept_id] = {
+                'dept_name': result.dept_name,
+                'data': {}
+            }
+        departments[dept_id]['data'][model_id] = result.count
+        totals[model_id] = totals.get(model_id, 0) + result.count
+
+    # Створення Excel-файлу
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Звіт за {month:02d}-{year}"
+
+    # Заголовки
+    headers = ['Підрозділ'] + [model.model_name for model in cartridge_models]
+    ws.append(headers)
+
+    # Дані по підрозділах
+    for dept in departments.values():
+        row = [dept['dept_name']] + [dept['data'].get(str(model.id), 0) for model in cartridge_models]
+        ws.append(row)
+
+    # Рядок "Всього"
+    total_row = ['Всього'] + [totals.get(str(model.id), 0) for model in cartridge_models]
+    ws.append(total_row)
+
+    # Форматування
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2) * 1.2
+        ws.column_dimensions[column].width = adjusted_width
+
+    # Збереження файлу в пам’ять
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'cartridge_distribution_{year}_{month:02d}.xlsx'
+    )
 
 
 if __name__ == '__main__':
