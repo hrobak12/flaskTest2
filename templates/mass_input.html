@@ -38,6 +38,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <div id="error-message" class="alert alert-danger" style="display: none;"></div>
                 <form id="massInputForm">
                     <input type="hidden" id="operation_type" name="operation_type">
                     <input type="hidden" id="status" name="status">
@@ -165,6 +166,9 @@
         0%, 50% { color: red; }
         25%, 75%, 100% { color: inherit; }
     }
+    #error-message {
+        margin-bottom: 15px;
+    }
 </style>
 {% endblock %}
 
@@ -195,7 +199,7 @@
     fetch('/api/departments')
         .then(response => response.json())
         .then(data => {
-            allDepts = data.departments; // Очікуємо формат: [{id  id, deptname, is_exec}, ...]
+            allDepts = data.departments; // Очікуємо формат: [{id, deptname, is_exec}, ...]
         })
         .catch(error => console.error('Помилка завантаження відділів:', error));
 
@@ -222,6 +226,7 @@
         suggestionsDropdown.classList.remove('show');
         printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
         printerSelect.disabled = true;
+        clearError();
 
         // Заповнення відділів
         execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
@@ -272,6 +277,7 @@
         printLabelBtn.style.display = 'none';
         printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
         printerSelect.disabled = true;
+        clearError();
     });
 
     // Автодоповнення
@@ -372,12 +378,14 @@
                     updateTable();
                     serialInput.value = '';
                     serialInput.focus();
+                    clearError();
                 } else {
                     const label = document.querySelector('label[for="serial_num"]');
                     label.classList.add('double-blink');
                     setTimeout(() => label.classList.remove('double-blink'), 1200);
                     serialInput.value = '';
                     serialInput.focus();
+                    showError(cartridge ? 'Цей картридж уже додано!' : 'Картридж не знайдено!');
                 }
             })
             .catch(error => {
@@ -387,6 +395,7 @@
                 setTimeout(() => label.classList.remove('double-blink'), 1200);
                 serialInput.value = '';
                 serialInput.focus();
+                showError('Помилка при отриманні даних картриджа!');
             });
     }
 
@@ -432,6 +441,7 @@
                     console.error('Помилка:', error);
                     printerSelect.innerHTML = '<option value="">Помилка завантаження</option>';
                     printerSelect.disabled = true;
+                    showError('Помилка завантаження принтерів!');
                 });
         } else {
             printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
@@ -463,6 +473,7 @@
                         setTimeout(() => label.classList.remove('double-blink'), 1200);
                         serialInput.focus();
                         serialInput.select();
+                        showError('Картридж не знайдено або недійсний!');
                     }
                 }
             })
@@ -473,6 +484,7 @@
                     setTimeout(() => label.classList.remove('double-blink'), 1200);
                     serialInput.focus();
                     serialInput.select();
+                    showError('Помилка при перевірці картриджа!');
                 }
             });
         }
@@ -484,45 +496,60 @@
         serialInput.dispatchEvent(event);
     }
 
+    // Функція для відображення помилки
+    function showError(message) {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+
+    // Функція для очищення помилки
+    function clearError() {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = '';
+        errorDiv.style.display = 'none';
+    }
+
     // Відправка форми
-    document.getElementById('confirmMassInput').addEventListener('click', () => {
+    document.getElementById('confirmMassInput').addEventListener('click', async () => {
         if (currentOperation !== 'single_process' && cartridges.length === 0) {
-            alert('Додайте хоча б один картридж!');
+            showError('Додайте хоча б один картридж!');
             return;
         }
         if (!execDeptSelect.value) {
-            alert('Виберіть відділ!');
+            showError('Виберіть відділ!');
             return;
         }
         if (currentOperation === 'single_process' && !serialInput.value.trim()) {
-            alert('Введіть серійний номер!');
+            showError('Введіть серійний номер!');
             return;
         }
         if (confirm('Ви впевнені?')) {
             if (currentOperation === 'single_process') {
                 const formData = new FormData(document.getElementById('massInputForm'));
                 formData.set('status', statusSelect.value);
-                fetch('/add_cartridge_event', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
+                try {
+                    const response = await fetch('/add_cartridge_event', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
                     if (data.success) {
                         alert('Подію додано!');
                         massInputModal.hide();
+                        clearError();
                     } else {
+                        showError(data.message);
                         if (data.message === 'Цей статус уже встановлено для картриджа!') {
                             const statusLabel = document.querySelector('label[for="status_select"]');
                             statusLabel.classList.add('double-blink');
                             setTimeout(() => statusLabel.classList.remove('double-blink'), 1200);
                             statusSelect.focus();
-                        } else {
-                            alert('Помилка: ' + data.message);
                         }
                     }
-                })
-                .catch(error => alert('Помилка при відправці: ' + error));
+                } catch (error) {
+                    showError('Помилка при відправці: ' + error);
+                }
             } else {
                 const formData = {
                     exec_dept: execDeptSelect.value,
@@ -531,13 +558,18 @@
                     parcel_track: document.getElementById('parcel_track')?.value || '',
                     printer: printerSelect.value || ''
                 };
-                fetch('/mass_add_cartridge_events', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                })
-                .then(response => response.blob())
-                .then(blob => {
+                try {
+                    const response = await fetch('/mass_add_cartridge_events', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        showError(errorData.message);
+                        return;
+                    }
+                    const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
@@ -545,8 +577,10 @@
                     a.click();
                     window.URL.revokeObjectURL(url);
                     massInputModal.hide();
-                })
-                .catch(error => alert('Помилка: ' + error));
+                    clearError();
+                } catch (error) {
+                    showError('Помилка: ' + error);
+                }
             }
         }
     });
@@ -557,7 +591,7 @@
         if (deptId) {
             window.open(`/generate_shipping_label/${deptId}`, '_blank');
         } else {
-            alert('Виберіть відділ!');
+            showError('Виберіть відділ!');
         }
     });
 

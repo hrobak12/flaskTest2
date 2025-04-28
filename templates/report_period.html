@@ -19,6 +19,39 @@
         </form>
     </div>
 
+    <!-- Модальне вікно для історії дій -->
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="historyModalLabel">Історія дій для картриджа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                                <th>Відділ</th>
+                                <th>Трек-номер</th>
+                                <th>Оновлено користувачем</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Дані завантажуються через JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" id="exportHistoryBtn" class="btn btn-excel">Звіт</a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Кінець модального вікна для історії дій -->
+
     <!-- Таблиця для результатів -->
     <div class="table-wrapper position-relative">
         <table class="table table-striped" id="report-table">
@@ -45,7 +78,6 @@
             </div>
         </div>
     </div>
-
 
     <style>
         .table-wrapper {
@@ -87,6 +119,7 @@
         const reportTableBody = document.getElementById('report-table-body');
         const loadingOverlay = document.getElementById('table-loading-overlay');
         const exportBtn = document.getElementById('export-report');
+        const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
 
         // Обробка відправки форми
         reportForm.addEventListener('submit', function(e) {
@@ -137,7 +170,7 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${index + 1}</td> <!-- Номер рядка -->
-                        <td>${item.serial_num}</td>
+                        <td><a href="#" class="serial-link" data-cartridge-id="${item.id}" onclick="showHistory(${item.id}); return false;">${item.serial_num}</a></td>
                         <td>${item.cartridge_model}</td>
                         <td>${item.status}</td>
                         <td>${new Date(item.date_ofchange).toLocaleString()}</td>
@@ -147,6 +180,48 @@
                     reportTableBody.appendChild(row);
                 });
             }
+        }
+
+        // Показ історії
+        function showHistory(cartridgeId) {
+            fetch(`/api/cartridge_history/${cartridgeId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateHistoryTable(data.history);
+                const exportBtn = document.getElementById('exportHistoryBtn');
+                exportBtn.href = `/export/cartridge_history/${cartridgeId}`;
+                historyModal.show();
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        // Оновлення таблиці історії
+        function updateHistoryTable(history) {
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+            const statusMap = {
+                0: 'Не вказано',
+                1: 'На зберіганні (порожній)',
+                2: 'Відправлено в користування',
+                3: 'Відправлено на заправку',
+                4: 'Непридатний (списаний)',
+                5: 'Одноразовий (фарба у банці)',
+                6: 'На зберіганні (заправлений)'
+            };
+            history.forEach(event => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(event.date_ofchange).toLocaleString()}</td>
+                    <td>${statusMap[event.status] || 'Невідомий'}</td>
+                    <td>${event.dept_name || 'Не вказано'}</td>
+                    <td>${event.parcel_track || 'Не вказано'}</td>
+                    <td>${event.user_login || 'Не вказано'}</td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
         // Встановлення поточної дати для start_date та end_date

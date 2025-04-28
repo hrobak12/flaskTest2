@@ -1666,7 +1666,8 @@ def mass_add_cartridge_events():
         if not cartridge:
             invalid_cartridges.append(serial_num)
             continue
-        if not status_checks[status](cartridge):
+# дозволено перехід картриджа на будь який статус, якщо його початковий статус 0 (тобто картридж новий)
+        if cartridge.curr_status != 0 and not status_checks[status](cartridge):
             invalid_cartridges.append(serial_num)
             continue
 
