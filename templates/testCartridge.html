@@ -110,7 +110,7 @@
         }
 
         .btn-custom:hover {
-            background: #374151;
+            background: #1f2937;
             transform: scale(1.03);
         }
 
@@ -119,6 +119,13 @@
             font-size: 2.8rem;
             color: #111827;
             margin-bottom: 2.5rem;
+        }
+
+        h3 {
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: #111827;
+            margin-bottom: 2rem;
         }
 
         ul {
@@ -186,6 +193,12 @@
             border-bottom: none;
         }
 
+        /* Ефект при наведенні на рядок */
+        .cartridge-table tbody tr:hover {
+            background-color: #f3f4f6;
+            cursor: pointer;
+        }
+
         /* Спінер завантаження */
         .spinner {
             display: none;
@@ -210,6 +223,38 @@
             color: #6b7280;
             font-size: 0.9rem;
             margin: 20px 0;
+        }
+
+        /* Стилі для міні-акордеона */
+        .cartridge-table tbody tr {
+            transition: background-color 0.3s ease;
+        }
+
+        .cartridge-table tbody tr.expanded {
+            background-color: #e5e7eb;
+        }
+
+        .details-row {
+            display: none;
+            background-color: #1f2937;
+            color: #ffffff;
+        }
+
+        .details-row.expanded {
+            display: table-row;
+        }
+
+        .details-table {
+            border-collapse: collapse;
+            width: 100%;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+        }
+
+        .details-table td {
+            padding: 4px 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            white-space: nowrap;
         }
     </style>
     {% endblock %}
@@ -287,7 +332,6 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
     {% endblock %}
@@ -367,6 +411,37 @@
     </div>
     {% endblock %}
 
+    <!-- Modal for Cartridge History -->
+    <div class="modal fade" id="cartridgeHistoryModal" tabindex="-1" aria-labelledby="cartridgeHistoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cartridgeHistoryModalLabel">Історія руху картриджа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="spinner" id="history-spinner"></div>
+                    <table class="cartridge-table" id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                                <th>Відділ</th>
+                                <th>Трек-номер</th>
+                                <th>Користувач</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="no-data" id="history-no-data">Немає історії</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-custom" data-bs-dismiss="modal">Закрити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     {% block scripts %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -390,26 +465,75 @@
                         const groupedData = data.cartridges.reduce((acc, cartridge) => {
                             const model = cartridge.cartridge_model || 'Не вказано';
                             if (!acc[model]) {
-                                acc[model] = 0;
+                                acc[model] = { count: 0, serials: [] };
                             }
-                            acc[model]++;
+                            acc[model].count++;
+                            acc[model].serials.push({ serial: cartridge.serial_num || 'Невідомий', id: cartridge.id });
                             return acc;
                         }, {});
 
                         const groupedArray = Object.keys(groupedData).map(model => ({
                             model: model,
-                            count: groupedData[model]
+                            count: groupedData[model].count,
+                            serials: groupedData[model].serials
                         }));
 
                         groupedArray.sort((a, b) => b.count - a.count);
 
                         groupedArray.forEach(item => {
+                            // Основний рядок
                             const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${item.model}</td>
-                                <td>${item.count} шт</td>
+                            row.classList.add('main-row');
+                            row.innerHTML = `<td>${item.model}</td><td>${item.count} шт</td>`;
+
+                            // Рядок із деталями
+                            const detailsRow = document.createElement('tr');
+                            detailsRow.classList.add('details-row');
+                            const detailsContent = `
+                                <td colspan="2">
+                                    <table class="details-table">
+                                        <tbody>
+                                            ${item.serials.map((serialObj, index) => `
+                                                <tr data-cartridge-id="${serialObj.id}" class="history-row">
+                                                    <td>${index + 1}.</td>
+                                                    <td>${item.model}</td>
+                                                    <td>${serialObj.serial}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </td>
                             `;
+                            detailsRow.innerHTML = detailsContent;
+
+                            // Додаємо обробник кліку для розгортання/згортання
+                            row.addEventListener('click', () => {
+                                const isExpanded = row.classList.contains('expanded');
+                                // Знімаємо клас expanded з усіх рядків у цій таблиці
+                                tableBody.querySelectorAll('.main-row').forEach(r => {
+                                    r.classList.remove('expanded');
+                                    const nextRow = r.nextElementSibling;
+                                    if (nextRow && nextRow.classList.contains('details-row')) {
+                                        nextRow.classList.remove('expanded');
+                                    }
+                                });
+                                // Якщо рядок не був розгорнутий, розгортаємо його
+                                if (!isExpanded) {
+                                    row.classList.add('expanded');
+                                    detailsRow.classList.add('expanded');
+                                }
+                            });
+
                             tableBody.appendChild(row);
+                            tableBody.appendChild(detailsRow);
+                        });
+
+                        // Додаємо обробник кліку для рядків історії
+                        tableBody.querySelectorAll('.history-row').forEach(row => {
+                            row.addEventListener('click', (e) => {
+                                const cartridgeId = row.getAttribute('data-cartridge-id');
+                                showCartridgeHistory(cartridgeId);
+                            });
                         });
                     } else {
                         noData.style.display = 'block';
@@ -438,13 +562,13 @@
                     spinner.style.display = 'none';
 
                     if (data.cartridges && data.cartridges.length > 0) {
-                        // Групування за dept_name
                         const groupedData = data.cartridges.reduce((acc, cartridge) => {
                             const dept = cartridge.dept_name || 'Не вказано';
                             if (!acc[dept]) {
-                                acc[dept] = { count: 0, latestDate: null };
+                                acc[dept] = { count: 0, latestDate: null, serials: [] };
                             }
                             acc[dept].count++;
+                            acc[dept].serials.push({ serial: cartridge.serial_num || 'Невідомий', id: cartridge.id });
                             const currentDate = cartridge.date_ofchange || '';
                             if (!acc[dept].latestDate || currentDate > acc[dept].latestDate) {
                                 acc[dept].latestDate = currentDate;
@@ -455,19 +579,70 @@
                         const groupedArray = Object.keys(groupedData).map(dept => ({
                             dept: dept,
                             count: groupedData[dept].count,
-                            latestDate: groupedData[dept].latestDate
+                            latestDate: groupedData[dept].latestDate,
+                            serials: groupedData[dept].serials
                         }));
 
                         groupedArray.sort((a, b) => b.count - a.count);
 
                         groupedArray.forEach(item => {
+                            // Основний рядок
                             const row = document.createElement('tr');
+                            row.classList.add('main-row');
                             row.innerHTML = `
                                 <td>${item.latestDate || 'Не вказано'}</td>
                                 <td>${item.dept}</td>
                                 <td>${item.count} шт</td>
                             `;
+
+                            // Рядок із деталями
+                            const detailsRow = document.createElement('tr');
+                            detailsRow.classList.add('details-row');
+                            const detailsContent = `
+                                <td colspan="3">
+                                    <table class="details-table">
+                                        <tbody>
+                                            ${item.serials.map((serialObj, index) => `
+                                                <tr data-cartridge-id="${serialObj.id}" class="history-row">
+                                                    <td>${index + 1}.</td>
+                                                    <td>${item.dept}</td>
+                                                    <td>${serialObj.serial}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </td>
+                            `;
+                            detailsRow.innerHTML = detailsContent;
+
+                            // Додаємо обробник кліку для розгортання/згортання
+                            row.addEventListener('click', () => {
+                                const isExpanded = row.classList.contains('expanded');
+                                // Знітаємо клас expanded з усіх рядків у цій таблиці
+                                tableBody.querySelectorAll('.main-row').forEach(r => {
+                                    r.classList.remove('expanded');
+                                    const nextRow = r.nextElementSibling;
+                                    if (nextRow && nextRow.classList.contains('details-row')) {
+                                        nextRow.classList.remove('expanded');
+                                    }
+                                });
+                                // Якщо рядок не був розгорнутий, розгортаємо його
+                                if (!isExpanded) {
+                                    row.classList.add('expanded');
+                                    detailsRow.classList.add('expanded');
+                                }
+                            });
+
                             tableBody.appendChild(row);
+                            tableBody.appendChild(detailsRow);
+                        });
+
+                        // Додаємо обробник кліку для рядків історії
+                        tableBody.querySelectorAll('.history-row').forEach(row => {
+                            row.addEventListener('click', (e) => {
+                                const cartridgeId = row.getAttribute('data-cartridge-id');
+                                showCartridgeHistory(cartridgeId);
+                            });
                         });
                     } else {
                         noData.style.display = 'block';
@@ -480,14 +655,61 @@
                 });
         }
 
+        // Функція для відображення історії картриджа
+        function showCartridgeHistory(cartridgeId) {
+            const modal = new bootstrap.Modal(document.getElementById('cartridgeHistoryModal'));
+            const tableBody = document.querySelector('#history-table tbody');
+            const spinner = document.querySelector('#history-spinner');
+            const noData = document.querySelector('#history-no-data');
+            const statusMap = {
+                0: 'Не вказано',
+                1: 'На зберіганні (порожній)',
+                2: 'Відправлено в користування',
+                3: 'Відправлено на заправку',
+                4: 'Непридатний (списаний)',
+                5: 'Одноразовий (фарба у банці)',
+                6: 'На зберіганні (заправлений)'
+            };
+
+            spinner.style.display = 'block';
+            noData.style.display = 'none';
+            tableBody.innerHTML = '';
+
+            fetch(`/api/cartridge_history/${cartridgeId}`)
+                .then(response => response.json())
+                .then(data => {
+                    spinner.style.display = 'none';
+
+                    if (data.history && data.history.length > 0) {
+                        data.history.forEach(item => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${new Date(item.date_ofchange).toLocaleString('uk-UA')}</td>
+                                <td>${statusMap[item.status] || 'Невідомий'}</td>
+                                <td>${item.dept_name || 'Не вказано'}</td>
+                                <td>${item.parcel_track || 'Немає'}</td>
+                                <td>${item.user_login || 'Не вказано'}</td>
+                            `;
+                            tableBody.appendChild(row);
+                        });
+                    } else {
+                        noData.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Помилка завантаження історії:', error);
+                    spinner.style.display = 'none';
+                    noData.style.display = 'block';
+                });
+
+            modal.show();
+        }
+
         // Завантаження даних для всіх таблиць
         document.addEventListener('DOMContentLoaded', () => {
-            loadCartridgesByModel('/api/cartridges_by_status?status_list=1&status_sort=desc',
-                                 'empty-cartridges-table', 'empty-spinner', 'empty-no-data');
-            loadCartridgesByModel('/api/cartridges_by_status?status_list=6&status_sort=desc',
-                                 'filled-cartridges-table', 'filled-spinner', 'filled-no-data');
-            loadCartridgesInTransit('/api/cartridges_by_status?status_list=3&status_sort=desc',
-                                   'transit-cartridges-table', 'transit-spinner', 'transit-no-data');
+            loadCartridgesByModel('/api/cartridges_by_status?status_list=1&status_sort=desc', 'empty-cartridges-table', 'empty-spinner', 'empty-no-data');
+            loadCartridgesByModel('/api/cartridges_by_status?status_list=6&status_sort=desc', 'filled-cartridges-table', 'filled-spinner', 'filled-no-data');
+            loadCartridgesInTransit('/api/cartridges_by_status?status_list=3&status_sort=desc', 'transit-cartridges-table', 'transit-spinner', 'transit-no-data');
         });
     </script>
     {% endblock %}

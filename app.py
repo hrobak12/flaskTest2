@@ -914,7 +914,8 @@ def api_cartridges_by_status():
 #            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,
             'date_ofchange': cartridge.time_updated.strftime('%Y-%m-%d') if cartridge.time_updated else None,
             'dept_name': dept_name or 'Не вказано',
-            'parcel_track': cartridge.curr_parcel_track or 'Не вказано'
+#            'parcel_track': cartridge.curr_parcel_track or 'Не вказано'
+            'parcel_track': cartridge.curr_parcel_track or ''
         })
 
     return jsonify({'cartridges': cartridges_data})
@@ -2386,6 +2387,33 @@ def export_cartridge_distribution_by_dept():
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
+
+"""
+@app.route('/api/cartridge_history_by_serial/<string:serial_num>', methods=['GET'])
+@login_required
+def api_cartridge_history_by_serial(serial_num):
+    # Find the cartridge by serial number
+    cartridge = Cartridges.query.filter_by(serial_num=serial_num).first()
+    if not cartridge:
+        return jsonify({'error': 'Cartridge not found'}), 404
+
+    # Use the existing endpoint logic with the found cartridge ID
+    history_query = db.session.query(CartridgeStatus, RefillDept.deptname, User.username)\
+                              .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
+                              .outerjoin(User, CartridgeStatus.user_updated == User.id)\
+                              .filter(CartridgeStatus.cartridge_id == cartridge.id)\
+                              .order_by(CartridgeStatus.date_ofchange.desc())
+    history_data = []
+    for status, dept_name, username in history_query.all():
+        history_data.append({
+            'date_ofchange': status.date_ofchange.isoformat(),
+            'status': status.status,
+            'dept_name': dept_name,
+            'parcel_track': status.parcel_track,
+            'user_login': username
+        })
+    return jsonify({'history': history_data})
+"""
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
