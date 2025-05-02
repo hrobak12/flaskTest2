@@ -231,8 +231,10 @@
         // Заповнення відділів
         execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
         const deptsToShow = (operation === 'issue_empty' || operation === 'receive_filled' || operation === 'receive_empty')
-            ? allDepts.filter(dept => dept.is_exec === 1)
+//            ? allDepts.filter(dept => dept.is_exec === 1)
+            ? allDepts.filter(dept => dept.is_exec > 0)
             : allDepts;
+//            : allDepts.filter(dept => dept.is_exec === 0);
         deptsToShow
             .sort((a, b) => a.deptname.localeCompare(b.deptname))
             .forEach(dept => {
