@@ -17,7 +17,8 @@ from barcode import Code128
 from barcode.writer import ImageWriter
 from transliterate import translit
 
-from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel, CompatibleCartridges, Contracts
+from models import (db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog,
+                    CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance)
 from config import status_map
 
 app = Flask(__name__)
