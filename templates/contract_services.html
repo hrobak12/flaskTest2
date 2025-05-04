@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% block title %}Послуги договорів{% endblock %}
+{% block content %}
+    <h1>Список послуг договорів</h1>
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <input type="text" id="search" class="form-control" placeholder="Пошук за номером договору або назвою послуги" style="max-width: 400px;">
+            <button id="clear-search" class="btn btn-danger btn-sm ms-2" title="Очистити пошук">
+                <span>×</span>
+            </button>
+        </div>
+        <div>
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addServiceModal">Додати послугу</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+        </div>
+    </div>
+    <table class="table table-striped" id="service-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Договір</th>
+                <th>Назва послуги</th>
+                <th>Тип послуги</th>
+                <th>Баланс</th>
+                <th>Дата оновлення</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody id="service-table-body">
+            <!-- Динамічно заповнюється через JavaScript -->
+        </tbody>
+    </table>
+
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center" id="pagination">
+            <!-- Пагінація оновлюється через JS -->
+        </ul>
+    </nav>
+
+    <!-- Модальне вікно для додавання послуги -->
+    <div class="modal fade" id="addServiceModal" tabindex="-1" aria-labelledby="addServiceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addServiceModalLabel">Додати послугу</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addServiceForm" method="post" action="/add_contract_service">
+                        <div class="mb-3">
+                            <label for="contract_id" class="form-label">Договір</label>
+                            <select class="form-control" id="contract_id" name="contract_id" required>
+                                <option value="">Виберіть договір</option>
+                                {% for contract in Contracts.query.all() %}
+                                    {% set dept = RefillDept.query.get(contract.contractor_id) %}
+                                    <option value="{{ contract.id }}">{{ contract.contract_number }} ({{ dept.deptname if dept else 'Невідомо' }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="RefillServiceName" class="form-label">Назва послуги</label>
+                            <input type="text" class="form-control" id="RefillServiceName" name="RefillServiceName" required maxlength="128">
+                        </div>
+                        <div class="mb-3">
+                            <label for="service_type" class="form-label">Тип послуги</label>
+                            <select class="form-control" id="service_type" name="service_type" required>
+                                <option value="">Виберіть тип</option>
+                                <option value="1">Заправка</option>
+                                <option value="2">Ремонт</option>
+                                <option value="3">Заміна</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="balance" class="form-label">Баланс</label>
+                            <input type="number" class="form-control" id="balance" name="balance" min="0" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Додати</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальне вікно для редагування послуги -->
+    <div class="modal fade" id="editServiceModal" tabindex="-1" aria-labelledby="editServiceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editServiceModalLabel">Редагувати послугу</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editServiceForm" method="post">
+                        <input type="hidden" id="edit_service_id" name="service_id">
+                        <div class="mb-3">
+                            <label for="edit_contract_id" class="form-label">Договір</label>
+                            <select class="form-control" id="edit_contract_id" name="contract_id" required>
+                                <option value="">Виберіть договір</option>
+                                {% for contract in Contracts.query.all() %}
+                                    {% set dept = RefillDept.query.get(contract.contractor_id) %}
+                                    <option value="{{ contract.id }}">{{ contract.contract_number }} ({{ dept.deptname if dept else 'Невідомо' }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_RefillServiceName" class="form-label">Назва послуги</label>
+                            <input type="text" class="form-control" id="edit_RefillServiceName" name="RefillServiceName" required maxlength="128">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_service_type" class="form-label">Тип послуги</label>
+                            <select class="form-control" id="edit_service_type" name="service_type" required>
+                                <option value="">Виберіть тип</option>
+                                <option value="1">Заправка</option>
+                                <option value="2">Ремонт</option>
+                                <option value="3">Заміна</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_balance" class="form-label">Баланс</label>
+                            <input type="number" class="form-control" id="edit_balance" name="balance" min="0" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Зберегти</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .actions-column {
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        #clear-search {
+            padding: 0.25rem 0.5rem;
+        }
+    </style>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        let timeout;
+        const searchInput = document.getElementById('search');
+        const clearSearchBtn = document.getElementById('clear-search');
+
+        // Ініціалізація модальних вікон Bootstrap
+        const addServiceModal = new bootstrap.Modal(document.getElementById('addServiceModal'));
+        const editServiceModal = new bootstrap.Modal(document.getElementById('editServiceModal'));
+
+        // Завантаження даних при відкритті сторінки
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchServices('', 1);
+        });
+
+        // Пошук із затримкою
+        searchInput.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const searchValue = this.value.trim();
+            timeout = setTimeout(() => {
+                fetchServices(searchValue, 1);
+            }, 300);
+        });
+
+        // Очищення пошуку
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            fetchServices('', 1);
+        });
+
+        // Очищення пошуку по Esc
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' || event.keyCode === 27) {
+                searchInput.value = '';
+                fetchServices('', 1);
+            }
+        });
+
+        // Завантаження послуг через API
+        function fetchServices(search, page) {
+            fetch(`/api/contract_services?search=${encodeURIComponent(search)}&page=${page}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                updateTable(data.services);
+                updatePagination(data.pagination);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        // Оновлення таблиці послуг
+        function updateTable(services) {
+            const tbody = document.getElementById('service-table-body');
+            tbody.innerHTML = '';
+            const serviceTypeMap = {
+                1: 'Заправка',
+                2: 'Ремонт',
+                3: 'Заміна'
+            };
+            services.forEach(service => {
+                const row = document.createElement('tr');
+                const formattedDate = service.time_updated
+                    ? new Intl.DateTimeFormat('uk-UA', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                      }).format(new Date(service.time_updated))
+                    : 'Не вказано';
+                row.innerHTML = `
+                    <td>${service.id}</td>
+                    <td>${service.contract_number} (${service.contractor_name})</td>
+                    <td>${service.RefillServiceName}</td>
+                    <td>${serviceTypeMap[service.service_type] || 'Невідомо'}</td>
+                    <td>${service.balance}</td>
+                    <td>${formattedDate}</td>
+                    <td class="actions-column">
+                        <button class="btn btn-warning btn-sm edit-btn" data-id="${service.id}" data-bs-toggle="modal" data-bs-target="#editServiceModal">Редагувати</button>
+                       BETTER <form action="/delete_contract_service/${service.id}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені, що хочете видалити цю послугу?');">Видалити</button>
+                        </form>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Додаємо обробник подій для кнопок редагування
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const serviceId = this.getAttribute('data-id');
+                    fetch(`/api/contract_service/${serviceId}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! Status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            document.getElementById('edit_service_id').value = data.id;
+                            document.getElementById('edit_contract_id').value = data.contract_id;
+                            document.getElementById('edit_RefillServiceName').value = data.RefillServiceName;
+                            document.getElementById('edit_service_type').value = data.service_type;
+                            document.getElementById('edit_balance').value = data.balance;
+                        })
+                        .catch(error => console.error('Помилка:', error));
+                });
+            });
+        }
+
+        // Оновлення пагінації
+        function updatePagination(pagination) {
+            const paginationUl = document.getElementById('pagination');
+            paginationUl.innerHTML = '';
+
+            if (pagination.has_prev) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchServices('${pagination.search}', ${pagination.prev_num}); return false;">Попередня</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Попередня</span></li>`;
+            }
+
+            pagination.pages.forEach(page => {
+                if (page === null) {
+                    paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                } else if (page === pagination.current_page) {
+                    paginationUl.innerHTML += `<li class="page-item active"><span class="page-link">${page}</span></li>`;
+                } else {
+                    paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchServices('${pagination.search}', ${page}); return false;">${page}</a></li>`;
+                }
+            });
+
+            if (pagination.has_next) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchServices('${pagination.search}', ${pagination.next_num}); return false;">Наступна</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Наступна</span></li>`;
+            }
+        }
+
+        // Обробка форми додавання послуги
+        document.getElementById('addServiceForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/add_contract_service', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    addServiceModal.hide();
+                    this.reset();
+                    fetchServices('', 1);
+                    alert('Послугу додано!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при додаванні послуги');
+            });
+        });
+
+        // Обробка форми редагування послуги
+        document.getElementById('editServiceForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/edit_contract_service/' + data.service_id, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    editServiceModal.hide();
+                    fetchServices('', 1);
+                    alert('Послугу оновлено!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при редагуванні послуги');
+            });
+        });
+    </script>
+{% endblock %}

@@ -17,7 +17,7 @@ from barcode import Code128
 from barcode.writer import ImageWriter
 from transliterate import translit
 
-from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel, CompatibleCartridges
+from models import db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog, CartridgeModel, CompatibleCartridges, Contracts
 from config import status_map
 
 app = Flask(__name__)
@@ -2388,32 +2388,321 @@ def export_cartridge_distribution_by_dept():
 def page_not_found(e):
     return render_template('404.html'), 404
 
-"""
-@app.route('/api/cartridge_history_by_serial/<string:serial_num>', methods=['GET'])
-@login_required
-def api_cartridge_history_by_serial(serial_num):
-    # Find the cartridge by serial number
-    cartridge = Cartridges.query.filter_by(serial_num=serial_num).first()
-    if not cartridge:
-        return jsonify({'error': 'Cartridge not found'}), 404
 
-    # Use the existing endpoint logic with the found cartridge ID
-    history_query = db.session.query(CartridgeStatus, RefillDept.deptname, User.username)\
-                              .outerjoin(RefillDept, CartridgeStatus.exec_dept == RefillDept.id)\
-                              .outerjoin(User, CartridgeStatus.user_updated == User.id)\
-                              .filter(CartridgeStatus.cartridge_id == cartridge.id)\
-                              .order_by(CartridgeStatus.date_ofchange.desc())
-    history_data = []
-    for status, dept_name, username in history_query.all():
-        history_data.append({
-            'date_ofchange': status.date_ofchange.isoformat(),
-            'status': status.status,
-            'dept_name': dept_name,
-            'parcel_track': status.parcel_track,
-            'user_login': username
-        })
-    return jsonify({'history': history_data})
-"""
+# CRUD для Contracts
+@app.route('/contracts')
+@login_required
+def contracts():
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    query = db.session.query(Contracts, RefillDept.deptname)\
+                      .outerjoin(RefillDept, RefillDept.id == Contracts.contractor_id)\
+                      .order_by(Contracts.id)
+    if search:
+        query = query.filter(Contracts.contract_number.ilike(f'%{search}%'))
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    contracts = [(c[0], c[1]) for c in pagination.items]
+    return render_template('contracts.html',
+                           contracts=contracts,
+                           search=search,
+                           RefillDept=RefillDept,
+                           pagination=pagination)
+
+@app.route('/api/contracts', methods=['GET'])
+@login_required
+def api_contracts():
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    query = db.session.query(Contracts, RefillDept.deptname)\
+                      .outerjoin(RefillDept, RefillDept.id == Contracts.contractor_id)\
+                      .order_by(Contracts.id)
+    if search:
+        query = query.filter(Contracts.contract_number.ilike(f'%{search}%'))
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    contracts = [{
+        'id': c[0].id,
+        'contract_number': c[0].contract_number,
+        'signing_date': c[0].signing_date.strftime('%Y-%m-%d'),
+        'expiry_date': c[0].expiry_date.strftime('%Y-%m-%d') if c[0].expiry_date else None,
+        'contractor_id': c[0].contractor_id,
+        'contractor_name': c[1] or 'Не вказано',
+        'description': c[0].description,
+        'status': c[0].status
+    } for c in pagination.items]
+    pagination_data = {
+        'has_prev': pagination.has_prev,
+        'prev_num': pagination.prev_num,
+        'has_next': pagination.has_next,
+        'next_num': pagination.next_num,
+        'current_page': pagination.page,
+        'pages': list(pagination.iter_pages()),
+        'search': search
+    }
+    return jsonify({'contracts': contracts, 'pagination': pagination_data})
+
+@app.route('/api/contract/<int:contract_id>', methods=['GET'])
+@login_required
+def api_contract(contract_id):
+    contract = Contracts.query.get_or_404(contract_id)
+    return jsonify({
+        'id': contract.id,
+        'contract_number': contract.contract_number,
+        'signing_date': contract.signing_date.strftime('%Y-%m-%d'),
+        'expiry_date': contract.expiry_date.strftime('%Y-%m-%d') if contract.expiry_date else '',
+        'contractor_id': contract.contractor_id,
+        'description': contract.description,
+        'status': contract.status
+    })
+
+@app.route('/add_contract', methods=['POST'])
+@login_required
+@admin_required
+def add_contract():
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    signing_date = data.get('signing_date')
+    expiry_date = data.get('expiry_date')
+    contractor_id = data.get('contractor_id')
+    description = data.get('description')
+    status = data.get('status')
+    if Contracts.query.filter_by(contract_number=contract_number).first():
+        return jsonify({'success': False, 'message': 'Договір із таким номером уже існує!'}), 400
+    try:
+        signing_date = datetime.strptime(signing_date, '%Y-%m-%d').date()
+        expiry_date = datetime.strptime(expiry_date, '%Y-%m-%d').date() if expiry_date else None
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Невірний формат дати!'}), 400
+    if not RefillDept.query.get(contractor_id):
+        return jsonify({'success': False, 'message': 'Невірний підрядник!'}), 400
+    if status not in ['active', 'inactive']:
+        return jsonify({'success': False, 'message': 'Невірний статус!'}), 400
+    contract = Contracts(
+        contract_number=contract_number,
+        signing_date=signing_date,
+        expiry_date=expiry_date,
+        contractor_id=contractor_id,
+        description=description,
+        status=status,
+        user_updated=current_user.id,
+        time_updated=datetime.utcnow()
+    )
+    db.session.add(contract)
+    event = EventLog(
+        table_name='contracts',
+        event_type=1,
+        user_updated=current_user.id
+    )
+    db.session.add(event)
+    try:
+        db.session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/edit_contract/<int:contract_id>', methods=['POST'])
+@login_required
+@admin_required
+def edit_contract(contract_id):
+    contract = Contracts.query.get_or_404(contract_id)
+    data = request.get_json()
+    contract_number = data.get('contract_number')
+    signing_date = data.get('signing_date')
+    expiry_date = data.get('expiry_date')
+    contractor_id = data.get('contractor_id')
+    description = data.get('description')
+    status = data.get('status')
+    if Contracts.query.filter(Contracts.contract_number == contract_number, Contracts.id != contract_id).first():
+        return jsonify({'success': False, 'message': 'Договір із таким номером уже існує!'}), 400
+    try:
+        signing_date = datetime.strptime(signing_date, '%Y-%m-%d').date()
+        expiry_date = datetime.strptime(expiry_date, '%Y-%m-%d').date() if expiry_date else None
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Невірний формат дати!'}), 400
+    if not RefillDept.query.get(contractor_id):
+        return jsonify({'success': False, 'message': 'Невірний підрядник!'}), 400
+    if status not in ['active', 'inactive']:
+        return jsonify({'success': False, 'message': 'Невірний статус!'}), 400
+    contract.contract_number = contract_number
+    contract.signing_date = signing_date
+    contract.expiry_date = expiry_date
+    contract.contractor_id = contractor_id
+    contract.description = description
+    contract.status = status
+    contract.user_updated = current_user.id
+    contract.time_updated = datetime.utcnow()
+    event = EventLog(
+        table_name='contracts',
+        event_type=2,
+        user_updated=current_user.id
+    )
+    db.session.add(event)
+    try:
+        db.session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/delete_contract/<int:contract_id>', methods=['POST'])
+@login_required
+@admin_required
+def delete_contract(contract_id):
+    contract = Contracts.query.get_or_404(contract_id)
+    db.session.delete(contract)
+    event = EventLog(
+        table_name='contracts',
+        event_type=3,
+        user_updated=current_user.id
+    )
+    db.session.add(event)
+    db.session.commit()
+    flash('Договір видалено!')
+    return redirect(url_for('contracts'))
+
+#--------------------------------
+@app.route('/contract_services')
+@login_required
+@admin_required
+def contract_services():
+    return render_template('contract_services.html', Contracts = Contracts, RefillDept = RefillDept)
+
+@app.route('/api/contract_services', methods=['GET'])
+@login_required
+@admin_required
+def get_contract_services():
+    search = request.args.get('search', '')
+    page = int(request.args.get('page', 1))
+    per_page = 10
+
+    query = ContractsServicesBalance.query.join(Contracts)
+    if search:
+        query = query.filter(
+            (Contracts.contract_number.ilike(f'%{search}%')) |
+            (ContractsServicesBalance.RefillServiceName.ilike(f'%{search}%'))
+        )
+
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    services = [{
+        'id': service.id,
+        'contract_id': service.contract_id,
+        'contract_number': service.contract.contract_number,
+        'contractor_name': RefillDept.query.get(service.contract.contractor_id).deptname if RefillDept.query.get(service.contract.contractor_id) else 'Невідомо',
+        'RefillServiceName': service.RefillServiceName,
+        'service_type': service.service_type,
+        'balance': service.balance,
+        'time_updated': service.time_updated.isoformat() if service.time_updated else None
+    } for service in pagination.items]
+
+    return jsonify({
+        'services': services,
+        'pagination': {
+            'current_page': pagination.page,
+            'pages': [i for i in range(1, pagination.pages + 1)],
+            'has_prev': pagination.has_prev,
+            'has_next': pagination.has_next,
+            'prev_num': pagination.prev_num,
+            'next_num': pagination.next_num,
+            'search': search
+        }
+    })
+
+@app.route('/api/contract_service/<int:id>', methods=['GET'])
+@login_required
+@admin_required
+def get_contract_service(id):
+    service = ContractsServicesBalance.query.get_or_404(id)
+    return jsonify({
+        'id': service.id,
+        'contract_id': service.contract_id,
+        'RefillServiceName': service.RefillServiceName,
+        'service_type': service.service_type,
+        'balance': service.balance
+    })
+
+@app.route('/add_contract_service', methods=['POST'])
+@login_required
+@admin_required
+def add_contract_service():
+    data = request.get_json()
+    if not all(key in data for key in ['contract_id', 'RefillServiceName', 'service_type', 'balance']):
+        return jsonify({'success': False, 'message': 'Відсутні обов’язкові поля'}), 400
+
+    # Перевірка унікальності
+    existing = ContractsServicesBalance.query.filter_by(
+        contract_id=data['contract_id'],
+        RefillServiceName=data['RefillServiceName'],
+        service_type=data['service_type']
+    ).first()
+    if existing:
+        return jsonify({'success': False, 'message': 'Така послуга вже існує для цього договору'}), 400
+
+    # Перевірка унікальності RefillServiceName
+    if ContractsServicesBalance.query.filter_by(RefillServiceName=data['RefillServiceName']).first():
+        return jsonify({'success': False, 'message': 'Назва послуги вже використовується'}), 400
+
+    service = ContractsServicesBalance(
+        contract_id=data['contract_id'],
+        RefillServiceName=data['RefillServiceName'],
+        service_type=data['service_type'],
+        balance=data['balance'],
+        user_updated=current_user.id,
+        time_updated=datetime.utcnow()
+    )
+    db.session.add(service)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/edit_contract_service/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def edit_contract_service(id):
+    service = ContractsServicesBalance.query.get_or_404(id)
+    data = request.get_json()
+    if not all(key in data for key in ['contract_id', 'RefillServiceName', 'service_type', 'balance']):
+        return jsonify({'success': False, 'message': 'Відсутні обов’язкові поля'}), 400
+
+    # Перевірка унікальності (окрім поточного запису)
+    existing = ContractsServicesBalance.query.filter(
+        ContractsServicesBalance.id != id,
+        ContractsServicesBalance.contract_id == data['contract_id'],
+        ContractsServicesBalance.RefillServiceName == data['RefillServiceName'],
+        ContractsServicesBalance.service_type == data['service_type']
+    ).first()
+    if existing:
+        return jsonify({'success': False, 'message': 'Така послуга вже існує для цього договору'}), 400
+
+    # Перевірка унікальності RefillServiceName (окрім поточного запису)
+    existing_name = ContractsServicesBalance.query.filter(
+        ContractsServicesBalance.id != id,
+        ContractsServicesBalance.RefillServiceName == data['RefillServiceName']
+    ).first()
+    if existing_name:
+        return jsonify({'success': False, 'message': 'Назва послуги вже використовується'}), 400
+
+    service.contract_id = data['contract_id']
+    service.RefillServiceName = data['RefillServiceName']
+    service.service_type = data['service_type']
+    service.balance = data['balance']
+    service.user_updated = current_user.id
+    service.time_updated = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/delete_contract_service/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def delete_contract_service(id):
+    service = ContractsServicesBalance.query.get_or_404(id)
+    db.session.delete(service)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

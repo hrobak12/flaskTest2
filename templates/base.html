@@ -47,6 +47,8 @@
                                 <li><a class="dropdown-item" href="{{ url_for('printer_models') }}">Моделі принтерів</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('cartridge_models') }}">Моделі картриджів</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('refill_depts') }}">Відділи</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('contracts') }}">Договори</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('contract_services') }}">Послуги договорів</a></li>
                                 {% if current_user.role == 'admin' %}
                                     <li><a class="dropdown-item" href="{{ url_for('users') }}">Користувачі</a></li>
                                 {% endif %}

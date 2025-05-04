@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import ForeignKey, String, Integer, DateTime
+from sqlalchemy import ForeignKey, String, Integer, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column #, DeclarativeBase
 from sqlalchemy.sql import func
 from sqlalchemy import Index
@@ -106,6 +106,37 @@ class CompatibleCartridges(db.Model):
         Index('idx_cartridge_model', 'cartridge_model_id'),
         db.UniqueConstraint('printer_model_id', 'cartridge_model_id', name='uniq_printer_cartridge'),
     )
+
+class Contracts(db.Model):
+    __tablename__ = "contracts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contract_number: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    signing_date: Mapped[datetime.date] = mapped_column(DateTime, nullable=False)
+    expiry_date: Mapped[datetime.date] = mapped_column(DateTime, nullable=True)
+    contractor_id: Mapped[int] = mapped_column(ForeignKey('refill_dept.id'), nullable=False)
+    description: Mapped[str] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default='active')
+    user_updated: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    time_updated: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    __table_args__ = (
+        Index('idx_contract_contractor', 'contractor_id'),
+    )
+
+class ContractsServicesBalance(db.Model):
+    __tablename__ = "contract_services_balance"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    RefillServiceName: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    contract_id: Mapped[int] = mapped_column(ForeignKey('contracts.id'), nullable=False)
+    service_type: Mapped[int] = mapped_column(Integer, nullable=False)
+    balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    user_updated: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
+    __table_args__ = (
+        UniqueConstraint('contract_id', 'service_type', 'RefillServiceName', name='uniq_service_balance'),
+        Index('idx_contract_service', 'contract_id'),
+        Index('idx_service_name', 'RefillServiceName'),
+    )
+
 
 class EventLog(db.Model):
     __tablename__ = "event_log"
