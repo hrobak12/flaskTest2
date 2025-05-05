@@ -18,7 +18,7 @@ from barcode.writer import ImageWriter
 from transliterate import translit
 
 from models import (db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog,
-                    CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance)
+                    CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance, CompatibleServices)
 from config import status_map
 
 app = Flask(__name__)
@@ -600,7 +600,11 @@ def cartridge_models():
                            models=pagination.items,
                            pagination=pagination,
                            search=search,
-                           PrinterModel=PrinterModel)  # Додаємо PrinterModel для відображення назви принтера
+                           PrinterModel=PrinterModel,
+                           Contracts = Contracts,
+                           RefillDept = RefillDept,
+                           CompatibleServices = CompatibleServices,
+                           ContractsServicesBalance = ContractsServicesBalance)  # Додаємо PrinterModel для відображення назви принтера
 
 @app.route('/add_cartridge_model', methods=['GET', 'POST'])
 @login_required
@@ -2578,7 +2582,7 @@ def get_contract_services():
     page = int(request.args.get('page', 1))
     per_page = 10
 
-    query = ContractsServicesBalance.query.join(Contracts)
+    query = ContractsServicesBalance.query.join(Contracts).join(RefillDept, Contracts.contractor_id == RefillDept.id)
     if search:
         query = query.filter(
             (Contracts.contract_number.ilike(f'%{search}%')) |
@@ -2589,8 +2593,8 @@ def get_contract_services():
     services = [{
         'id': service.id,
         'contract_id': service.contract_id,
-        'contract_number': service.contract.contract_number,
-        'contractor_name': RefillDept.query.get(service.contract.contractor_id).deptname if RefillDept.query.get(service.contract.contractor_id) else 'Невідомо',
+        'contract_number': Contracts.query.get(service.contract_id).contract_number,
+        'contractor_name': RefillDept.query.get(Contracts.query.get(service.contract_id).contractor_id).deptname if RefillDept.query.get(Contracts.query.get(service.contract_id).contractor_id) else 'Невідомо',
         'RefillServiceName': service.RefillServiceName,
         'service_type': service.service_type,
         'balance': service.balance,
@@ -2701,8 +2705,111 @@ def delete_contract_service(id):
     db.session.commit()
     return jsonify({'success': True})
 
+#--------------------------------------------
+
+@app.route('/api/compatible_service/<int:cartridge_model_id>', methods=['GET'])
+@login_required
+@admin_required
+def get_compatible_service(cartridge_model_id):
+    service_mapping = CompatibleServices.query.filter_by(cartridge_model_id=cartridge_model_id).first()
+    if service_mapping:
+        service = ContractsServicesBalance.query.get(service_mapping.service_id)
+        return jsonify({
+            'service_id': service_mapping.service_id,
+            'contract_id': service.contract_id
+        })
+    return jsonify({})
 
 
+@app.route('/api/compatible_service/<int:cartridge_model_id>', methods=['POST'])
+@login_required
+@admin_required
+def save_compatible_service(cartridge_model_id):
+    data = request.get_json()
+    if not data.get('service_id'):
+        return jsonify({'message': 'Необхідно вказати ID послуги'}), 400
+
+    # Перевірка існування картриджа та послуги
+    CartridgeModel.query.get_or_404(cartridge_model_id)
+    ContractsServicesBalance.query.get_or_404(data['service_id'])
+
+    # Перевірка існуючого запису
+    existing = CompatibleServices.query.filter_by(cartridge_model_id=cartridge_model_id).first()
+
+    if existing:
+        # Якщо той самий service_id, повертаємо успіх без змін
+        if existing.service_id == data['service_id']:
+            return jsonify({'success': True})
+        # Оновлюємо існуючий запис
+        existing.service_id = data['service_id']
+        existing.user_updated = current_user.id
+        existing.time_updated = datetime.utcnow()
+    else:
+        # Створюємо новий запис
+        mapping = CompatibleServices(
+            cartridge_model_id=cartridge_model_id,
+            service_id=data['service_id'],
+            user_updated=current_user.id,
+            time_updated=datetime.utcnow()
+        )
+        db.session.add(mapping)
+
+    try:
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Помилка збереження: {str(e)}'}), 500
+
+
+@app.route('/api/compatible_service/<int:cartridge_model_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_compatible_service(cartridge_model_id):
+    # Перевірка існування картриджа
+    CartridgeModel.query.get_or_404(cartridge_model_id)
+
+    # Видалення запису
+    existing = CompatibleServices.query.filter_by(cartridge_model_id=cartridge_model_id).first()
+    if existing:
+        db.session.delete(existing)
+        try:
+            db.session.commit()
+            return jsonify({'success': True})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'message': f'Помилка видалення: {str(e)}'}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/contract_services/<int:contract_id>', methods=['GET'])
+@login_required
+@admin_required
+def get_services_by_contract(contract_id):
+    services = ContractsServicesBalance.query.filter_by(contract_id=contract_id).all()
+    return jsonify([{
+        'id': service.id,
+        'RefillServiceName': service.RefillServiceName,
+        'service_type': service.service_type
+    } for service in services])
+
+
+@app.route('/api/decrement_service_balance/<int:service_id>', methods=['POST'])
+@login_required
+def decrement_service_balance(service_id):
+    service = ContractsServicesBalance.query.get_or_404(service_id)
+    if service.balance <= 0:
+        return jsonify({'message': f'Недостатньо балансу для послуги {service.RefillServiceName}'}), 400
+
+    try:
+        service.balance -= 1
+        service.user_updated = current_user.id
+        service.time_updated = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'success': True, 'new_balance': service.balance})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Помилка: {str(e)}'}), 500
 
 
 if __name__ == '__main__':

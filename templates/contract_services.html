@@ -221,9 +221,7 @@
                     <td>${formattedDate}</td>
                     <td class="actions-column">
                         <button class="btn btn-warning btn-sm edit-btn" data-id="${service.id}" data-bs-toggle="modal" data-bs-target="#editServiceModal">Редагувати</button>
-                       BETTER <form action="/delete_contract_service/${service.id}" method="POST" class="d-inline">
-                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені, що хочете видалити цю послугу?');">Видалити</button>
-                        </form>
+                        <button class="btn btn-danger btn-sm delete-btn" data-id="${service.id}">Видалити</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -248,6 +246,37 @@
                             document.getElementById('edit_balance').value = data.balance;
                         })
                         .catch(error => console.error('Помилка:', error));
+                });
+            });
+
+            // Додаємо обробник подій для кнопок видалення
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const serviceId = this.getAttribute('data-id');
+                    if (confirm('Ви впевнені, що хочете видалити цю послугу?')) {
+                        fetch(`/delete_contract_service/${serviceId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! Status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                fetchServices('', 1);
+                                alert('Послугу видалено!');
+                            } else {
+                                alert('Помилка при видаленні послуги');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Помилка:', error);
+                            alert('Помилка при видаленні послуги');
+                        });
+                    }
                 });
             });
         }

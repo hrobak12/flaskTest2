@@ -137,6 +137,20 @@ class ContractsServicesBalance(db.Model):
         Index('idx_service_name', 'RefillServiceName'),
     )
 
+class CompatibleServices(db.Model):
+    __tablename__ = "compatible_services"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cartridge_model_id: Mapped[int] = mapped_column(ForeignKey('cartrg_model.id'), nullable=False)
+    service_id: Mapped[int] = mapped_column(ForeignKey('contract_services_balance.id'), nullable=False)
+    user_updated: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
+    __table_args__ = (
+        UniqueConstraint('cartridge_model_id', 'service_id', name='uniq_cartridge_service'),
+        Index('idx_compat_cartridge_model', 'cartridge_model_id'),
+        Index('idx_compat_service_id', 'service_id'),
+    )
+
+
 
 class EventLog(db.Model):
     __tablename__ = "event_log"

@@ -28,7 +28,10 @@
             {% for model in models %}
             <tr>
                 <td>{{ model.id }}</td>
-                <td>{{ model.model_name }}</td>
+                <td>
+                    {% set mapping = CompatibleServices.query.filter_by(cartridge_model_id=model.id).first() %}
+                    <span {% if mapping %}style="color: #28a745;"{% endif %}>{{ model.model_name }}</span>
+                </td>
                 <td>
                     {% if model.model_type == 0 %}Тонер + барабан{% endif %}
                     {% if model.model_type == 1 %}Тільки тонер{% endif %}
@@ -42,6 +45,7 @@
                     <form action="{{ url_for('delete_cartridge_model', model_id=model.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Ви впевнені, що хочете видалити цю модель?');">
                         <button type="submit" class="btn btn-danger btn-sm">Видалити</button>
                     </form>
+                    <button class="btn btn-primary btn-sm" onclick="openServiceModal({{ model.id }}, '{{ model.model_name | escape }}')">Зовнішня послуга</button>
                 </td>
             </tr>
             {% endfor %}
@@ -88,4 +92,166 @@
             {% endif %}
         </ul>
     </nav>
+
+    <!-- Модальне вікно для прив’язки послуги -->
+    <div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="serviceModalLabel">Зовнішня послуга для <span id="cartridgeName"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="serviceForm">
+                        <div class="mb-3">
+                            <label for="contractSelect" class="form-label">Договір</label>
+                            <select class="form-control" id="contractSelect" name="contract_id" required>
+                                <option value="">Виберіть договір</option>
+                                {% for contract in Contracts.query.all() %}
+                                    {% set dept = RefillDept.query.get(contract.contractor_id) %}
+                                    <option value="{{ contract.id }}">{{ contract.contract_number }} ({{ dept.deptname if dept else 'Невідомо' }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="serviceSelect" class="form-label">Послуга</label>
+                            <select class="form-control" id="serviceSelect" name="service_id" required>
+                                <option value="">Спочатку виберіть договір</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="saveService">Зберегти</button>
+                    <button type="button" class="btn btn-danger" id="clearService">Очистити прив’язку</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Скрипти -->
+    <script>
+        let currentCartridgeId = null;
+
+        // Відкриття модального вікна
+        async function openServiceModal(cartridgeId, cartridgeName) {
+            currentCartridgeId = cartridgeId;
+            document.getElementById('cartridgeName').textContent = cartridgeName;
+            document.getElementById('contractSelect').value = '';
+            document.getElementById('serviceSelect').innerHTML = '<option value="">Спочатку виберіть договір</option>';
+            await loadCurrentService(cartridgeId);
+            new bootstrap.Modal(document.getElementById('serviceModal')).show();
+        }
+
+        // Завантаження поточної прив’язаної послуги
+        async function loadCurrentService(cartridgeId) {
+            try {
+                const response = await fetch(`/api/compatible_service/${cartridgeId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.service_id) {
+                        document.getElementById('contractSelect').value = data.contract_id;
+                        await loadServices(data.contract_id, data.service_id);
+                    }
+                }
+            } catch (error) {
+                console.error('Помилка завантаження послуги:', error);
+            }
+        }
+
+        // Завантаження списку послуг для договору
+        async function loadServices(contractId, selectedServiceId = null) {
+            const serviceSelect = document.getElementById('serviceSelect');
+            serviceSelect.innerHTML = '<option value="">Виберіть послугу</option>';
+            if (contractId) {
+                try {
+                    const response = await fetch(`/api/contract_services/${contractId}`);
+                    const services = await response.json();
+                    services.forEach(service => {
+                        const option = document.createElement('option');
+                        option.value = service.id;
+                        option.textContent = `${service.RefillServiceName} (${service.service_type == 1 ? 'Заправка' : service.service_type == 2 ? 'Ремонт' : 'Заміна'})`;
+                        if (service.id == selectedServiceId) {
+                            option.selected = true;
+                        }
+                        serviceSelect.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Помилка завантаження послуг:', error);
+                    serviceSelect.innerHTML = '<option value="">Помилка завантаження</option>';
+                }
+            }
+        }
+
+        // Обробка зміни вибору договору
+        document.getElementById('contractSelect').addEventListener('change', async (e) => {
+            const contractId = e.target.value;
+            await loadServices(contractId);
+        });
+
+        // Збереження прив’язаної послуги
+        document.getElementById('saveService').addEventListener('click', async () => {
+            const serviceId = document.getElementById('serviceSelect').value;
+            if (!serviceId || isNaN(parseInt(serviceId))) {
+                alert('Будь ласка, виберіть дійсну послугу');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/compatible_service/${currentCartridgeId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ service_id: parseInt(serviceId) })
+                });
+
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('serviceModal')).hide();
+                    alert('Послугу успішно прив’язано!');
+                    window.location.reload(); // Оновлення сторінки для відображення змін
+                } else {
+                    const error = await response.json();
+                    alert(`Помилка: ${error.message || 'Невідома помилка'}`);
+                }
+            } catch (error) {
+                console.error('Помилка збереження:', error);
+                alert('Помилка при збереженні послуги');
+            }
+        });
+
+        // Очищення прив’язки
+        document.getElementById('clearService').addEventListener('click', async () => {
+            if (!confirm('Ви впевнені, що хочете очистити прив’язку послуги для цього картриджа?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/compatible_service/${currentCartridgeId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('serviceModal')).hide();
+                    alert('Прив’язку успішно очищено!');
+                    document.getElementById('contractSelect').value = '';
+                    document.getElementById('serviceSelect').innerHTML = '<option value="">Спочатку виберіть договір</option>';
+                    window.location.reload(); // Оновлення сторінки для відображення змін
+                } else {
+                    const error = await response.json();
+                    alert(`Помилка: ${error.message || 'Невідома помилка'}`);
+                }
+            } catch (error) {
+                console.error('Помилка очищення:', error);
+                alert('Помилка при очищенні прив’язки');
+            }
+        });
+    </script>
+    <style>
+        .table th, .table td {
+            height: 38px;
+            vertical-align: middle;
+            padding: 0.5rem;
+        }
+    </style>
 {% endblock %}
