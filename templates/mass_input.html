@@ -115,15 +115,15 @@
     .btn-secondary { background-color: #6c757d; border-color: #6c757d; }
     .btn-info { background-color: #17a2b8; border-color: #17a2b8; }
     .btn-ukrposhta {
-        background-color: #FFC107; /* Жовтий фон, як у Укрпошти */
+        background-color: #FFC107;
         border-color: #FFC107;
     }
     .btn-ukrposhta:hover,
     .btn-ukrposhta:active,
     .btn-ukrposhta:focus {
-        background-color: #e0a800; /* Темніший відтінок при наведенні, натисканні, фокусі */
+        background-color: #e0a800;
         border-color: #e0a800;
-        outline: none; /* Прибираємо обведення при фокусі */
+        outline: none;
     }
     .sticky-header {
         position: sticky;
@@ -191,19 +191,15 @@
     let currentOperation = '';
     let currentStatus = 0;
     let selectedIndex = -1;
-
-    // Масив для всіх відділів
     let allDepts = [];
 
-    // Завантаження відділів при ініціалізації
     fetch('/api/departments')
         .then(response => response.json())
         .then(data => {
-            allDepts = data.departments; // Очікуємо формат: [{id, deptname, is_exec}, ...]
+            allDepts = data.departments;
         })
         .catch(error => console.error('Помилка завантаження відділів:', error));
 
-    // Відкриття модального вікна
     function openMassModal(operation, status) {
         currentOperation = operation;
         currentStatus = status;
@@ -211,14 +207,12 @@
         document.getElementById('status').value = status || '';
         document.getElementById('massInputModalLabel').textContent = getModalTitle(operation);
 
-        // Налаштування полів
         parcelTrackField.style.display = (operation === 'issue_empty' || operation === 'single_process') ? 'block' : 'none';
         printerField.style.display = (operation === 'issue_filled' || operation === 'single_process') ? 'block' : 'none';
         statusField.style.display = (operation === 'single_process') ? 'block' : 'none';
         cartridgeTable.style.display = (operation !== 'single_process') ? 'block' : 'none';
         printLabelBtn.style.display = (operation === 'issue_empty' || operation === 'single_process') ? 'inline-block' : 'none';
 
-        // Очищення
         cartridges = [];
         tableBody.innerHTML = '';
         document.getElementById('massInputForm').reset();
@@ -228,13 +222,10 @@
         printerSelect.disabled = true;
         clearError();
 
-        // Заповнення відділів
         execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
         const deptsToShow = (operation === 'issue_empty' || operation === 'receive_filled' || operation === 'receive_empty')
-//            ? allDepts.filter(dept => dept.is_exec === 1)
             ? allDepts.filter(dept => dept.is_exec > 0)
             : allDepts;
-//            : allDepts.filter(dept => dept.is_exec === 0);
         deptsToShow
             .sort((a, b) => a.deptname.localeCompare(b.deptname))
             .forEach(dept => {
@@ -247,7 +238,6 @@
         massInputModal.show();
     }
 
-    // Заголовок модального вікна
     function getModalTitle(operation) {
         switch (operation) {
             case 'issue_filled': return 'Видача заправлених картриджів';
@@ -259,12 +249,10 @@
         }
     }
 
-    // Фокус при відкритті
     document.getElementById('massInputModal').addEventListener('shown.bs.modal', () => {
         serialInput.focus();
     });
 
-    // Очищення при закритті
     document.getElementById('massInputModal').addEventListener('hidden.bs.modal', () => {
         document.getElementById('massInputForm').reset();
         suggestionsDropdown.innerHTML = '';
@@ -282,7 +270,6 @@
         clearError();
     });
 
-    // Автодоповнення
     serialInput.addEventListener('input', debounce((e) => {
         const query = e.target.value.trim();
         if (query.length >= 2) {
@@ -296,7 +283,6 @@
         }
     }, 300));
 
-    // Обробка клавіатури
     serialInput.addEventListener('keydown', (e) => {
         const items = suggestionsDropdown.querySelectorAll('.dropdown-item');
         if (e.key === 'Enter') {
@@ -326,7 +312,6 @@
         }
     });
 
-    // Оновлення пропозицій автодоповнення
     function updateSuggestions(cartridgesData) {
         suggestionsDropdown.innerHTML = '';
         selectedIndex = -1;
@@ -355,7 +340,6 @@
         }
     }
 
-    // Оновлення виділення в автодоповненні
     function updateSelection(items) {
         items.forEach((item, index) => {
             item.classList.toggle('active', index === selectedIndex);
@@ -365,7 +349,6 @@
         }
     }
 
-    // Отримання деталей картриджа (для масового введення)
     function fetchCartridgeDetails(serialNum) {
         fetch(`/api/cartridges?search=${encodeURIComponent(serialNum)}`)
             .then(response => response.json())
@@ -401,7 +384,6 @@
             });
     }
 
-    // Оновлення таблиці (для масового введення)
     function updateTable() {
         tableBody.innerHTML = '';
         cartridges.forEach((cartridge, index) => {
@@ -416,14 +398,12 @@
         });
     }
 
-    // Видалення картриджа
     window.removeCartridge = function(index) {
         cartridges.splice(index, 1);
         updateTable();
         serialInput.focus();
     };
 
-    // Завантаження принтерів
     execDeptSelect.addEventListener('change', () => {
         const deptId = execDeptSelect.value;
         if (deptId && (currentOperation === 'issue_filled' || currentOperation === 'single_process')) {
@@ -451,7 +431,6 @@
         }
     });
 
-    // Обробка blur для serial_num (для single_process)
     serialInput.addEventListener('blur', (e) => {
         if (currentOperation !== 'single_process') return;
         const serialNum = e.target.value.trim();
@@ -492,27 +471,23 @@
         }
     });
 
-    // Програмний blur
     function triggerBlurEvent() {
         const event = new Event('blur');
         serialInput.dispatchEvent(event);
     }
 
-    // Функція для відображення помилки
     function showError(message) {
         const errorDiv = document.getElementById('error-message');
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
     }
 
-    // Функція для очищення помилки
     function clearError() {
         const errorDiv = document.getElementById('error-message');
         errorDiv.textContent = '';
         errorDiv.style.display = 'none';
     }
 
-    // Відправка форми
     document.getElementById('confirmMassInput').addEventListener('click', async () => {
         if (currentOperation !== 'single_process' && cartridges.length === 0) {
             showError('Додайте хоча б один картридж!');
@@ -542,7 +517,7 @@
                         clearError();
                     } else {
                         showError(data.message);
-                        if (data.message === 'Цей статус уже встановлено для картриджа!') {
+                        if (data.message.includes('Недостатньо балансу')) {
                             const statusLabel = document.querySelector('label[for="status_select"]');
                             statusLabel.classList.add('double-blink');
                             setTimeout(() => statusLabel.classList.remove('double-blink'), 1200);
@@ -587,7 +562,6 @@
         }
     });
 
-    // Друкування ярлика
     document.getElementById('printLabelBtn').addEventListener('click', () => {
         const deptId = execDeptSelect.value;
         if (deptId) {
@@ -597,7 +571,6 @@
         }
     });
 
-    // Debounce для автодоповнення
     function debounce(func, wait) {
         let timeout;
         return function (...args) {

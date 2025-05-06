@@ -668,12 +668,6 @@ def delete_cartridge_model(model_id):
 
 
 #**************************робота з картриджами**************************
-#DEPRECATED. Застаріле.
-#@app.route('/processCartridge')
-#@login_required
-#def processCartridge():
-#    return render_template('processCartridge.html', user=current_user, RefillDept=RefillDept)
-
 @app.route('/add_cartridge_event', methods=['POST'])
 @login_required
 def add_cartridge_event():
@@ -696,12 +690,27 @@ def add_cartridge_event():
     if cartridge.curr_status == int(status):
         return jsonify({'success': False, 'message': 'Цей статус уже встановлено для картриджа!'})
 
+    # Перевірка для статусів 3 або 5, якщо is_exec == 2
+    if int(status) in [3, 5]:
+        dept = RefillDept.query.filter_by(id=exec_dept).first()
+        if dept and dept.is_exec == 2 and cartridge.cartrg_model_id:
+            # Перевірка, чи модель картриджа прив’язана до послуги
+            service_mapping = CompatibleServices.query.filter_by(cartridge_model_id=cartridge.cartrg_model_id).first()
+            if service_mapping:
+                service = ContractsServicesBalance.query.get(service_mapping.service_id)
+                if service and service.balance > 0:
+                    service.balance -= 1
+                    service.user_updated = current_user.id
+                    service.time_updated = datetime.utcnow()
+                else:
+                    db.session.rollback()
+                    return jsonify({'success': False, 'message': f'Недостатньо балансу для послуги {service.RefillServiceName}'})
 
     # Додавання події в CartridgeStatus
     new_status = CartridgeStatus(
         cartridge_id=cartridge.id,
         status=int(status),
-        date_ofchange=datetime.now(),  # Поточна дата з урахуванням часового поясу сервера
+        date_ofchange=datetime.now(),
         parcel_track=parcel_track,
         exec_dept=int(exec_dept),
         user_updated=current_user.id,
@@ -713,10 +722,9 @@ def add_cartridge_event():
     cartridge.curr_status = int(status)
     cartridge.curr_dept = int(exec_dept)
     cartridge.curr_parcel_track = parcel_track
-    cartridge.in_printer = int(printer) if printer else None  # Оновлюємо принтер, якщо вибрано
+    cartridge.in_printer = int(printer) if printer else None
     cartridge.user_updated = current_user.id
     cartridge.time_updated = datetime.now()
-
 
     try:
         db.session.commit()
@@ -725,6 +733,7 @@ def add_cartridge_event():
         return jsonify({'success': False, 'message': f'Помилка: {str(e)}'})
 
     return jsonify({'success': True})
+
 
 
 @app.route('/check_cartridge', methods=['POST'])
@@ -1635,6 +1644,7 @@ def export_report_period():
 def mass_input():
     return render_template('mass_input.html', RefillDept=RefillDept)
 
+
 @app.route('/mass_add_cartridge_events', methods=['POST'])
 @login_required
 def mass_add_cartridge_events():
@@ -1648,10 +1658,10 @@ def mass_add_cartridge_events():
     if not exec_dept or not serial_nums:
         return jsonify({'success': False, 'message': 'Необхідно вказати відділ і хоча б один картридж!'}), 400
 
-    # Перевірка відділу (для заправки лише is_exec=1)
-    is_exec_required = status in [3, 6]  # На заправку або прийом заправлених
+    # Перевірка відділу (для заправки is_exec>=1)
+    is_exec_required = status in [3, 6]
     dept = RefillDept.query.filter_by(id=exec_dept).first()
-    if not dept or (is_exec_required and dept.is_exec != 1):
+    if not dept or (is_exec_required and dept.is_exec < 1):
         return jsonify({'success': False, 'message': 'Недійсний відділ для цієї операції!'}), 400
 
     # Оптимізоване завантаження картриджів одним запитом
@@ -1661,18 +1671,34 @@ def mass_add_cartridge_events():
     report_data = []
     invalid_cartridges = []
     status_checks = {
-        2: lambda c: c.curr_status == 6,  # Видача заправлених: лише із заправлених
-        3: lambda c: c.curr_status == 1,  # Видача порожніх: лише із порожніх
-        6: lambda c: c.curr_status == 3,  # Прийом заправлених: лише із "Відправлено на заправку"
-        1: lambda c: c.curr_status == 2   # Прийом порожніх: із "Відправлено в користування"
+        2: lambda c: c.curr_status == 6,
+        3: lambda c: c.curr_status == 1,
+        6: lambda c: c.curr_status == 3,
+        1: lambda c: c.curr_status == 2
     }
+
+    # Перевірка для статусів 3 або 5, якщо is_exec == 2
+    if status in [3, 5]:
+        if dept.is_exec == 2:
+            for serial_num in serial_nums:
+                cartridge = cartridge_dict.get(serial_num)
+                if cartridge and cartridge.cartrg_model_id:
+                    service_mapping = CompatibleServices.query.filter_by(cartridge_model_id=cartridge.cartrg_model_id).first()
+                    if service_mapping:
+                        service = ContractsServicesBalance.query.get(service_mapping.service_id)
+                        if service and service.balance > 0:
+                            service.balance -= 1
+                            service.user_updated = current_user.id
+                            service.time_updated = datetime.utcnow()
+                        else:
+                            db.session.rollback()
+                            return jsonify({'success': False, 'message': f'Недостатньо балансу для послуги {service.RefillServiceName}'})
 
     for serial_num in serial_nums:
         cartridge = cartridge_dict.get(serial_num)
         if not cartridge:
             invalid_cartridges.append(serial_num)
             continue
-# дозволено перехід картриджа на будь який статус, якщо його початковий статус 0 (тобто картридж новий)
         if cartridge.curr_status != 0 and not status_checks[status](cartridge):
             invalid_cartridges.append(serial_num)
             continue
@@ -1725,13 +1751,11 @@ def mass_add_cartridge_events():
     p.drawString(100, 800, f"Звіт: {status_titles.get(status, 'Масова операція')}")
     p.drawString(100, 780, f"Відділ: {dept.deptname}")
     p.drawString(100, 760, f"Дата: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
     y = 740
     p.drawString(50, y, "Серійний номер")
     p.drawString(200, y, "Модель картриджа")
     p.drawString(350, y, "Дата/Час")
     y -= 20
-
     for item in report_data:
         if y < 50:
             p.showPage()
@@ -1741,13 +1765,13 @@ def mass_add_cartridge_events():
         p.drawString(200, y, item['cartridge_model'])
         p.drawString(350, y, item['date_time'])
         y -= 20
-
     p.showPage()
     p.save()
     buffer.seek(0)
 
     return Response(buffer.getvalue(), mimetype='application/pdf',
                     headers={"Content-Disposition": f"attachment;filename=mass_operation_{status}_report.pdf"})
+
 
 
 
