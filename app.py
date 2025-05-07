@@ -19,7 +19,7 @@ from transliterate import translit
 
 from models import (db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog,
                     CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance, CompatibleServices)
-from config import status_map
+from config import status_map, human_readable_date
 
 app = Flask(__name__)
 # Тільки для розробки
@@ -862,29 +862,6 @@ def printers_by_dept(dept_id):
     ]
     return jsonify({'printers': printers_data})
 
-#тестовий ендпоінт для фільтрації статусу картриджів
-#@app.route('/api/cartridges_by_status/<int:cartridge_status>', methods=['GET'])
-#@login_required
-#def api_cartridges_by_status(cartridge_status):
-#    # Запит до Cartridges із фільтром по curr_status (1 або 6) і приєднанням RefillDept
-#    in_storage_query = db.session.query(Cartridges, RefillDept.deptname)\
-#                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
-#                                 .filter(Cartridges.curr_status == cartridge_status) \
-#                                 .order_by(Cartridges.cartridge_model.asc())
-#
-#    cartridges_data = []
-#    for cartridge, dept_name in in_storage_query.all():
-#        cartridges_data.append({
-#            'id': cartridge.id,
-#            'serial_num': cartridge.serial_num,
-#            'cartridge_model': cartridge.cartridge_model,
-#            'status': cartridge.curr_status,  # Беремо curr_status із Cartridges
-#            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,  # Використовуємо time_updated
-#            'dept_name': dept_name or 'Не вказано'
-#        })
-#    return jsonify({'cartridges': cartridges_data})
-
-
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-
 #на заміну in_transit_cartridges та in_storage_cartridges
 @app.route('/api/cartridges_by_status', methods=['GET'])
@@ -927,6 +904,7 @@ def api_cartridges_by_status():
             'status': cartridge.curr_status,  # Залишаємо числовий статус
 #            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,
             'date_ofchange': cartridge.time_updated.strftime('%Y-%m-%d') if cartridge.time_updated else None,
+#            'date_ofchange': human_readable_date(str(cartridge.time_updated)) if cartridge.time_updated else None,
             'dept_name': dept_name or 'Не вказано',
 #            'parcel_track': cartridge.curr_parcel_track or 'Не вказано'
             'parcel_track': cartridge.curr_parcel_track or ''
