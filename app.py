@@ -902,66 +902,12 @@ def api_cartridges_by_status():
             'serial_num': cartridge.serial_num,
             'cartridge_model': model_name or 'Не вказано',  # Використовуємо CartridgeModel.model_name
             'status': cartridge.curr_status,  # Залишаємо числовий статус
-#            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,
             'date_ofchange': cartridge.time_updated.strftime('%Y-%m-%d') if cartridge.time_updated else None,
-#            'date_ofchange': human_readable_date(str(cartridge.time_updated)) if cartridge.time_updated else None,
             'dept_name': dept_name or 'Не вказано',
-#            'parcel_track': cartridge.curr_parcel_track or 'Не вказано'
             'parcel_track': cartridge.curr_parcel_track or ''
         })
 
     return jsonify({'cartridges': cartridges_data})
-
-"""
-#DEPRECATED. Застаріле, до видалення.
-
-@app.route('/api/in_transit_cartridges', methods=['GET'])
-@login_required
-def api_in_transit_cartridges():
-    # Запит до Cartridges із фільтром по curr_status == 3 і приєднанням RefillDept
-    in_transit_query = db.session.query(Cartridges, RefillDept.deptname)\
-                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
-                                 .filter(Cartridges.curr_status == 3)\
-                                 .order_by(Cartridges.time_updated.desc())
-
-    cartridges_data = []
-    for cartridge, dept_name in in_transit_query.all():
-        cartridges_data.append({
-            'id': cartridge.id,
-            'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model,
-            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,
-            'dept_name': dept_name or 'Не вказано',
-            'parcel_track': cartridge.curr_parcel_track or 'Не вказано'
-        })
-
-    return jsonify({'cartridges': cartridges_data})
-
-
-# Новий ендпоінт для "На зберіганні"
-
-@app.route('/api/in_storage_cartridges', methods=['GET'])
-@login_required
-def api_in_storage_cartridges():
-    # Запит до Cartridges із фільтром по curr_status (1 або 6) і приєднанням RefillDept
-    in_storage_query = db.session.query(Cartridges, RefillDept.deptname)\
-                                 .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
-                                 .filter(Cartridges.curr_status.in_([1, 6]))\
-                                 .order_by(Cartridges.cartridge_model.asc())
-
-    cartridges_data = []
-    for cartridge, dept_name in in_storage_query.all():
-        cartridges_data.append({
-            'id': cartridge.id,
-            'serial_num': cartridge.serial_num,
-            'cartridge_model': cartridge.cartridge_model,
-            'status': cartridge.curr_status,  # Беремо curr_status із Cartridges
-            'date_ofchange': cartridge.time_updated.isoformat() if cartridge.time_updated else None,  # Використовуємо time_updated
-            'dept_name': dept_name or 'Не вказано'
-        })
-    return jsonify({'cartridges': cartridges_data})
-#
-"""
 
 #маршрут для отримання історії дій картриджа:
 @app.route('/api/cartridge_history/<int:cartridge_id>', methods=['GET'])
