@@ -1341,7 +1341,7 @@ def export_cartridges_table():
                 printer_model = PrinterModel.query.get(equipment.print_model)
                 dept = RefillDept.query.get(equipment.print_dept)
                 in_printer_info = f"{printer_model.model_name} ({dept.deptname})"
-        ws.append([cartridge.id, cartridge.serial_num, cartridge.cartridge_model or "Не вказано", in_printer_info])
+        ws.append([cartridge.id, cartridge.serial_num, CartridgeModel.query.get(cartridge.cartrg_model_id).model_name or "Не вказано", in_printer_info])
 
     # Налаштування ширини колонок
     column_widths = {}
@@ -1376,7 +1376,6 @@ pdfmetrics.registerFont(TTFont('TimesNewRomanBold', 'static/ttf/Timesbd.ttf'))  
 
 @app.route('/generate_shipping_label/<int:dept_id>', methods=['GET'])
 @login_required
-@admin_required
 def generate_shipping_label(dept_id):
     # Отримуємо відділ відправника (з dept_id поточного користувача)
     sender_dept = RefillDept.query.get_or_404(current_user.dept_id)
@@ -2295,7 +2294,7 @@ def export_cartridge_distribution_by_dept():
         totals[model_id] = totals.get(model_id, 0) + result.count
 
     # Створення Excel-файлу
-    wb = openpyxl.Workbook()
+    wb = Workbook()
     ws = wb.active
     ws.title = f"Звіт за {month:02d}-{year}"
 
