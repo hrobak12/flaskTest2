@@ -21,7 +21,7 @@ from models import (db, User, RefillDept, PrinterModel, CustomerEquipment, Cartr
                     CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance, CompatibleServices)
 
 from config import status_map
-from services import getDepartmentsList
+from services import getDepartmentsList, getCartridgesList
 
 app = Flask(__name__)
 # Тільки для розробки
@@ -865,52 +865,6 @@ def printers_by_dept(dept_id):
     return jsonify({'printers': printers_data})
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-
-#на заміну in_transit_cartridges та in_storage_cartridges
-@app.route('/api/cartridges_by_status', methods=['GET'])
-@login_required
-def api_cartridges_by_status():
-    # Отримуємо параметри з запиту
-    status_list_str = request.args.get('status_list')
-    status_sort = request.args.get('status_sort', 'asc').lower()
-
-    # Перевірка status_list
-    if not status_list_str:
-        return jsonify({'error': 'status_list parameter is required'}), 400
-
-    try:
-        # Конвертуємо status_list із рядка (наприклад, "1,5,6") у список цілих чисел
-        status_list = [int(s) for s in status_list_str.split(',') if s.strip()]
-        if not status_list:
-            return jsonify({'error': 'status_list cannot be empty'}), 400
-    except ValueError:
-        return jsonify({'error': 'status_list must contain valid integers'}), 400
-
-    # Перевірка status_sort
-    if status_sort not in ['asc', 'desc']:
-        return jsonify({'error': 'status_sort must be "asc" or "desc"'}), 400
-    sort_func = asc if status_sort == 'asc' else desc
-
-    # Запит до Cartridges із фільтром по curr_status і приєднанням RefillDept та CartridgeModel
-    query = db.session.query(Cartridges, RefillDept.deptname, CartridgeModel.model_name)\
-                     .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
-                     .outerjoin(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)\
-                     .filter(Cartridges.curr_status.in_(status_list))\
-                     .order_by(sort_func(Cartridges.time_updated))
-
-    cartridges_data = []
-    for cartridge, dept_name, model_name in query.all():
-        cartridges_data.append({
-            'id': cartridge.id,
-            'serial_num': cartridge.serial_num,
-            'cartridge_model': model_name or 'Не вказано',  # Використовуємо CartridgeModel.model_name
-            'status': cartridge.curr_status,  # Залишаємо числовий статус
-            'date_ofchange': cartridge.time_updated.strftime('%Y-%m-%d') if cartridge.time_updated else None,
-            'dept_name': dept_name or 'Не вказано',
-            'parcel_track': cartridge.curr_parcel_track or ''
-        })
-
-    return jsonify({'cartridges': cartridges_data})
-
 #маршрут для отримання історії дій картриджа:
 @app.route('/api/cartridge_history/<int:cartridge_id>', methods=['GET'])
 @login_required
@@ -1758,35 +1712,6 @@ def generate_all_barcodes():
     return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name=f"all_barcodes_{datetime.now().strftime('%Y-%m-%d')}.pdf")
 
 
-@app.route('/api/departments', methods=['GET'])
-@login_required
-def get_departments():
-    """
-    Повертає список відділів у форматі JSON із фільтрацією за is_exec і сортуванням.
-
-    Query-параметри:
-        is_exec (int, optional): Фільтр за is_exec (0, 1 або 2). Якщо не вказано, повертаються всі відділи.
-        order (str, optional): Порядок сортування ('asc' або 'desc').
-
-    Returns:
-        JSON: Список словників із полями id, deptname, dept_description, addr1-addr5.
-    """
-    # Отримання query-параметрів
-    is_exec = request.args.get('is_exec', default=None, type=int)
-    order = request.args.get('order', default='asc', type=str)
-
-    # Валідація параметрів
-    if is_exec is not None and is_exec not in {0, 1, 2}:
-        return jsonify({'success': False, 'message': 'is_exec must be 0, 1, or 2'}), 400
-    if order.lower() not in {'asc', 'desc'}:
-        return jsonify({'success': False, 'message': 'order must be "asc" or "desc"'}), 400
-
-    try:
-        # Виклик функції getDepartmentsList
-        departments = getDepartmentsList(is_exec=is_exec, order=order)
-        return jsonify({'success': True, 'departments': departments})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 
 @app.route('/update_cartridge_barcodes', methods=['POST'])
@@ -2779,6 +2704,77 @@ def decrement_service_balance(service_id):
         db.session.rollback()
         return jsonify({'message': f'Помилка: {str(e)}'}), 500
 
+#тут будуть нові маршрути, які будуть використовуватися з BluePrints
+#=============================================API=======================================================================
+@app.route('/api/departments', methods=['GET'])
+@login_required
+def api_departments():
+    """
+    Повертає список відділів у форматі JSON із фільтрацією за is_exec і сортуванням.
+
+    Query-параметри:
+        is_exec (int, optional): Фільтр за is_exec (0, 1 або 2). Якщо не вказано, повертаються всі відділи.
+        order (str, optional): Порядок сортування ('asc' або 'desc').
+
+    Returns:
+        JSON: Список словників із полями id, deptname, dept_description, addr1-addr5.
+    """
+    # Отримання query-параметрів
+    is_exec = request.args.get('is_exec', default=None, type=int)
+    order = request.args.get('order', default='asc', type=str)
+
+    # Валідація параметрів
+    if is_exec is not None and is_exec not in {0, 1, 2}:
+        return jsonify({'success': False, 'message': 'is_exec must be 0, 1, or 2'}), 400
+    if order.lower() not in {'asc', 'desc'}:
+        return jsonify({'success': False, 'message': 'order must be "asc" or "desc"'}), 400
+
+    try:
+        # Виклик функції getDepartmentsList
+        departments = getDepartmentsList(is_exec=is_exec, order=order)
+        return jsonify({'success': True, 'departments': departments})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+#=======================================================================================================================
+@app.route('/api/cartridges_by_status', methods=['GET'])
+@login_required
+def api_cartridges_by_status():
+    """
+    Повертає список картриджів у форматі JSON із фільтрацією за списком статусів і сортуванням.
+
+    Query-параметри:
+        status_list (str, optional): Список статусів, розділених комами (наприклад, '1,5,6'). Якщо не вказано, повертаються всі картриджі.
+        status_sort (str, optional): Порядок сортування ('asc' або 'desc'). За замовчуванням 'asc'.
+
+    Returns:
+        JSON: Список словників із полями id, serial_num, cartridge_model, status, date_ofchange, dept_name, parcel_track.
+    """
+    # Отримуємо параметри з запиту
+    status_list_str = request.args.get('status_list')
+    status_sort = request.args.get('status_sort', 'asc').lower()
+
+    # Перевірка status_sort
+    if status_sort not in ['asc', 'desc']:
+        return jsonify({'error': 'status_sort must be "asc" or "desc"'}), 400
+
+    # Обробка status_list
+    status_list = None
+    if status_list_str:
+        try:
+            # Конвертуємо status_list із рядка (наприклад, "1,5,6") у список цілих чисел
+            status_list = [int(s) for s in status_list_str.split(',') if s.strip()]
+            if not status_list:
+                return jsonify({'error': 'status_list cannot be empty'}), 400
+        except ValueError:
+            return jsonify({'error': 'status_list must contain valid integers'}), 400
+
+    try:
+        # Виклик функції getCartridgesByStatus
+        cartridges = getCartridgesList(status_list=status_list, status_sort=status_sort)
+        return jsonify({'cartridges': cartridges})
+    except Exception as e:
+        return jsonify({'error': f'Error: {str(e)}'}), 500
+#=======================================================================================================================
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

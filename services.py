@@ -44,3 +44,47 @@ def getDepartmentsList(is_exec=None, order='asc'):
 
     return data
 #-----------------------------------------------------------------------------------------------------------------------
+def getCartridgesList(status_list=None, status_sort='asc'):
+    """
+    Отримує список картриджів як список словників із фільтрацією за списком статусів і сортуванням.
+
+    Args:
+        status_list (list, optional): Список статусів для фільтрації (наприклад, [1, 5, 6]). Якщо None, повертаються всі
+            картриджі.
+        status_sort (str): Порядок сортування ('asc' або 'desc').
+
+    Returns:
+        list: Список словників із полями id, serial_num, cartridge_model, status, date_ofchange, dept_name,
+            parcel_track
+    """
+    # Визначення функції сортування
+    sort_func = asc if status_sort.lower() == 'asc' else desc
+
+    # Запит до Cartridges із приєднанням RefillDept та CartridgeModel
+    query = db.session.query(Cartridges, RefillDept.deptname, CartridgeModel.model_name)\
+                     .outerjoin(RefillDept, Cartridges.curr_dept == RefillDept.id)\
+                     .outerjoin(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)
+
+    # Фільтрація за status_list, якщо надано
+    if status_list is not None:
+        query = query.filter(Cartridges.curr_status.in_(status_list))
+
+    # Сортування за time_updated
+    query = query.order_by(sort_func(Cartridges.time_updated))
+
+    # Формування списку словників
+    data = [
+        {
+            'id': cartridge.id,
+            'serial_num': cartridge.serial_num,
+            'cartridge_model': model_name or 'Не вказано',
+            'status': cartridge.curr_status,
+            'date_ofchange': cartridge.time_updated.strftime('%Y-%m-%d') if cartridge.time_updated else None,
+            'dept_name': dept_name or 'Не вказано',
+            'parcel_track': cartridge.curr_parcel_track or ''
+        }
+        for cartridge, dept_name, model_name in query.all()
+    ]
+
+    return data
+#-----------------------------------------------------------------------------------------------------------------------
