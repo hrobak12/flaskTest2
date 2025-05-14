@@ -19,7 +19,9 @@ from transliterate import translit
 
 from models import (db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog,
                     CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance, CompatibleServices)
-from config import status_map, human_readable_date
+
+from config import status_map
+from services import getDepartmentsList
 
 app = Flask(__name__)
 # Тільки для розробки
@@ -1759,13 +1761,32 @@ def generate_all_barcodes():
 @app.route('/api/departments', methods=['GET'])
 @login_required
 def get_departments():
-    departments = RefillDept.query.all()
-    return jsonify({
-        'departments': [
-            {'id': dept.id, 'deptname': dept.deptname, 'is_exec': dept.is_exec}
-            for dept in departments
-        ]
-    })
+    """
+    Повертає список відділів у форматі JSON із фільтрацією за is_exec і сортуванням.
+
+    Query-параметри:
+        is_exec (int, optional): Фільтр за is_exec (0, 1 або 2). Якщо не вказано, повертаються всі відділи.
+        order (str, optional): Порядок сортування ('asc' або 'desc').
+
+    Returns:
+        JSON: Список словників із полями id, deptname, dept_description, addr1-addr5.
+    """
+    # Отримання query-параметрів
+    is_exec = request.args.get('is_exec', default=None, type=int)
+    order = request.args.get('order', default='asc', type=str)
+
+    # Валідація параметрів
+    if is_exec is not None and is_exec not in {0, 1, 2}:
+        return jsonify({'success': False, 'message': 'is_exec must be 0, 1, or 2'}), 400
+    if order.lower() not in {'asc', 'desc'}:
+        return jsonify({'success': False, 'message': 'order must be "asc" or "desc"'}), 400
+
+    try:
+        # Виклик функції getDepartmentsList
+        departments = getDepartmentsList(is_exec=is_exec, order=order)
+        return jsonify({'success': True, 'departments': departments})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 
 @app.route('/update_cartridge_barcodes', methods=['POST'])

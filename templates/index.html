@@ -108,9 +108,7 @@
                         <label for="receiver_dept" class="form-label">Виберіть відділ одержувач</label>
                         <select class="form-select" id="receiver_dept" name="receiver_dept" required>
                             <option value="">Не вказано</option>
-                            {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
-                                <option value="{{ dept.id }}">{{ dept.deptname }}</option>
-                            {% endfor %}
+                            <!-- Опції завантажуються через JavaScript -->
                         </select>
                     </div>
                 </div>
@@ -514,6 +512,30 @@
             tbody.appendChild(row);
         });
     }
+
+    // Завантаження відділів для модального вікна друку ярлика
+    document.getElementById('printLabelModal').addEventListener('shown.bs.modal', () => {
+        fetch('/api/departments')
+            .then(response => response.json())
+            .then(data => {
+                const receiverDeptSelect = document.getElementById('receiver_dept');
+                receiverDeptSelect.innerHTML = '<option value="">Не вказано</option>';
+                if (data.success) {
+                    data.departments.forEach(dept => {
+                        const option = document.createElement('option');
+                        option.value = dept.id;
+                        option.textContent = dept.dept_description ? `${dept.deptname} (${dept.dept_description})` : dept.deptname;
+                        receiverDeptSelect.appendChild(option);
+                    });
+                } else {
+                    alert(`Помилка: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка завантаження відділів:', error);
+                alert('Помилка завантаження відділів!');
+            });
+    });
 
     // Друкування ярлика в модальному вікні
     document.getElementById('printLabelConfirmBtn').addEventListener('click', () => {
