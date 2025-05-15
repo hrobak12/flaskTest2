@@ -88,3 +88,22 @@ def getCartridgesList(status_list=None, status_sort='asc'):
 
     return data
 #-----------------------------------------------------------------------------------------------------------------------
+def getStatusList():
+    """
+    Отримує список статусів як список словників
+
+    Args:
+        Відсутні.
+
+    Returns:
+        list: Список словників із полями status_id, status_name.
+    """
+    from config import status_map
+
+    data = [
+        {"status_id": status_id, "status_name": status_name}
+        for status_id, status_name in status_map.items()
+    ]
+
+    return data
+#-----------------------------------------------------------------------------------------------------------------------

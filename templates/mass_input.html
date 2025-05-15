@@ -50,13 +50,7 @@
                     <div class="mb-3" id="status_field" style="display: none;">
                         <label for="status_select" class="form-label">Статус</label>
                         <select class="form-select" id="status_select" name="status_select">
-                            <option value="0">Не вказано</option>
-                            <option value="1">На зберіганні (порожній)</option>
-                            <option value="2">Відправлено в користування</option>
-                            <option value="3">Відправлено на заправку</option>
-                            <option value="4">Непридатний (списаний)</option>
-                            <option value="5">Одноразовий (фарба у банці)</option>
-                            <option value="6">На зберіганні (заправлений)</option>
+                            <option value="">Завантаження статусів...</option>
                         </select>
                     </div>
                     <div class="card" id="cartridge_table" style="display: none;">
@@ -235,6 +229,24 @@
                 execDeptSelect.appendChild(option);
             });
 
+        if (operation === 'single_process') {
+            fetch('/api/statuses')
+                .then(response => response.json())
+                .then(data => {
+                    statusSelect.innerHTML = '';
+                    data.forEach(status => {
+                        const option = document.createElement('option');
+                        option.value = status.status_id;
+                        option.textContent = status.status_name;
+                        statusSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Помилка завантаження статусів:', error);
+                    statusSelect.innerHTML = '<option value="">Помилка завантаження статусів</option>';
+                });
+        }
+
         massInputModal.show();
     }
 
@@ -267,6 +279,7 @@
         printLabelBtn.style.display = 'none';
         printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
         printerSelect.disabled = true;
+        statusSelect.innerHTML = '<option value="">Завантаження статусів...</option>';
         clearError();
     });
 

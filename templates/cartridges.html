@@ -3,7 +3,6 @@
 {% block content %}
     <h1>Список картриджів</h1>
 
-
 <!-- Модальне вікно для історії дій -->
     <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -37,8 +36,6 @@
     </div>
 <!-- кінець модального вікна для історії дій -->
 
-
-
     <div class="mb-3 d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">
             <input type="text" id="search" class="form-control" placeholder="Пошук за серійним номером" value="{{ search }}" style="max-width: 400px;">
@@ -53,7 +50,6 @@
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
         </div>
     </div>
-
 
     <table class="table table-striped" id="cartridge-table">
         <thead>
@@ -109,13 +105,28 @@
         let timeout;
         const searchInput = document.getElementById('search');
         const clearSearchBtn = document.getElementById('clear-search');
-
         const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+        let statusMap = {};
 
-        // Виклик при завантаженні сторінки
+        // Завантаження статусів при ініціалізації сторінки
         window.addEventListener('DOMContentLoaded', (event) => {
-            const initialSearch = searchInput.value.trim();
-            fetchCartridges(initialSearch, 1);
+            fetch('/api/statuses')
+                .then(response => response.json())
+                .then(data => {
+                    statusMap = data.reduce((map, status) => {
+                        map[status.status_id] = status.status_name;
+                        return map;
+                    }, {});
+                    const initialSearch = searchInput.value.trim();
+                    fetchCartridges(initialSearch, 1);
+                })
+                .catch(error => {
+                    console.error('Помилка завантаження статусів:', error);
+                    // Fallback: якщо не вдалося завантажити статуси, використовуємо порожній об'єкт
+                    statusMap = {};
+                    const initialSearch = searchInput.value.trim();
+                    fetchCartridges(initialSearch, 1);
+                });
         });
 
         // Обробка введення з debounce
@@ -143,9 +154,6 @@
 
         function fetchCartridges(search, page) {
             const tbody = document.getElementById('cartridge-table-body');
-            // Показуємо "Завантажується..." перед початком запиту
-            // tbody.innerHTML = '<tr><td colspan="6" class="text-center">Завантажується...</td></tr>';
-
             fetch(`/api/cartridges?search=${encodeURIComponent(search)}&page=${page}`, {
                 method: 'GET',
                 headers: {
@@ -175,13 +183,7 @@
                         ${cartridge.in_printer_info || 'Немає'}
                     </td>
                     <td>
-                        ${cartridge.curr_status === 0 ? 'Не вказано' :
-                          cartridge.curr_status === 1 ? 'На зберіганні (порожній)' :
-                          cartridge.curr_status === 2 ? 'Відправлено в користування' :
-                          cartridge.curr_status === 3 ? 'Відправлено на заправку' :
-                          cartridge.curr_status === 4 ? 'Непридатний (списаний)' :
-                          cartridge.curr_status === 5 ? 'Одноразовий (фарба у банці)' :
-                          cartridge.curr_status === 6 ? 'На зберіганні (заправлений)' : 'Невідомий статус'}
+                        ${statusMap[cartridge.curr_status] || 'Невідомий статус'}
                     </td>
                     <td class="actions-column">
                         <a href="#" class="btn btn-warning btn-sm" onclick="generateBarcode(${cartridge.id}); return false;">Наклейка</a>
@@ -222,7 +224,6 @@
             }
         }
 
-
         // Показ історії
         function showHistory(cartridgeId) {
             fetch(`/api/cartridge_history/${cartridgeId}`, {
@@ -243,15 +244,6 @@
         function updateHistoryTable(history) {
             const tbody = document.getElementById('history-table-body');
             tbody.innerHTML = '';
-            const statusMap = {
-                0: 'Не вказано',
-                1: 'На зберіганні (порожній)',
-                2: 'Відправлено в користування',
-                3: 'Відправлено на заправку',
-                4: 'Непридатний (списаний)',
-                5: 'Одноразовий (фарба у банці)',
-                6: 'На зберіганні (заправлений)'
-            };
             history.forEach(event => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -303,6 +295,5 @@
             })
             .catch(error => console.error('Помилка:', error));
         }
-
     </script>
 {% endblock %}

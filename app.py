@@ -21,7 +21,7 @@ from models import (db, User, RefillDept, PrinterModel, CustomerEquipment, Cartr
                     CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance, CompatibleServices)
 
 from config import status_map
-from services import getDepartmentsList, getCartridgesList
+from services import *
 
 app = Flask(__name__)
 # Тільки для розробки
@@ -2704,6 +2704,7 @@ def decrement_service_balance(service_id):
         db.session.rollback()
         return jsonify({'message': f'Помилка: {str(e)}'}), 500
 
+#=============================================API=======================================================================
 #тут будуть нові маршрути, які будуть використовуватися з BluePrints
 #=============================================API=======================================================================
 @app.route('/api/departments', methods=['GET'])
@@ -2775,6 +2776,19 @@ def api_cartridges_by_status():
     except Exception as e:
         return jsonify({'error': f'Error: {str(e)}'}), 500
 #=======================================================================================================================
+@app.route('/api/statuses', methods=['GET'])
+@login_required
+def get_statuses():
+    """
+    Отримує список статусів для випадаючих списків у модальних вікнах.
+
+    Returns:
+        JSON: Список словників із полями status_id, status_name.
+    """
+    statuses = getStatusList()
+    return jsonify(statuses)
+#=======================================================================================================================
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
