@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Інвентаризація картриджів{% endblock %}
+{% block content %}
+    <h1>Інвентаризація картриджів на зберіганні</h1>
+
+    <!-- Модальне вікно для введення серійного номера -->
+    <div class="modal fade" id="serialModal" tabindex="-1" aria-labelledby="serialModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="serialModalLabel">Введіть серійний номер</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="serial-input" class="form-control" placeholder="Серійний номер" autofocus>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="submitSerial()">Підтвердити</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div>
+            <button class="btn btn-primary me-2" onclick="startOver()">Почати спочатку</button>
+            <button id="complete-btn" class="btn btn-success me-2 disabled" onclick="completeInventory()">Завершити</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+        </div>
+    </div>
+
+    <table class="table table-striped" id="inventory-table">
+        <thead>
+            <tr>
+                <th>Статус</th>
+                <th>Серійний номер</th>
+                <th>Модель картриджа</th>
+            </tr>
+        </thead>
+        <tbody id="inventory-table-body">
+            <!-- Дані завантажуються через JS -->
+        </tbody>
+    </table>
+
+    <style>
+        .checkbox-red { background-color: #ff4d4d; width: 20px; height: 20px; border: 1px solid #ddd; }
+        .checkbox-green { background-color: #4dff4d; width: 20px; height: 20px; border: 1px solid #ddd; }
+        .checkbox-yellow { background-color: #ffff4d; width: 20px; height: 20px; border: 1px solid #ddd; }
+        .checkbox-empty { background-color: #ffffff; width: 20px; height: 20px; border: 1px solid #ddd; }
+        .cartridge-model { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    </style>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        let scannedCartridges = new Set();
+        let statusMap = {};
+        const serialModal = new bootstrap.Modal(document.getElementById('serialModal'));
+
+        // Завантаження статусів і картриджів
+        window.addEventListener('DOMContentLoaded', (event) => {
+            fetch('/api/statuses')
+                .then(response => response.json())
+                .then(data => {
+                    statusMap = data.reduce((map, status) => {
+                        map[status.status_id] = status.status_name;
+                        return map;
+                    }, {});
+                    fetchCartridges();
+                })
+                .catch(error => {
+                    console.error('Помилка завантаження статусів:', error);
+                    statusMap = {};
+                    fetchCartridges();
+                });
+        });
+
+        function fetchCartridges() {
+            const tbody = document.getElementById('inventory-table-body');
+            fetch('/api/cartridges_by_status?status_list=1,6,7&status_sort=asc')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    updateTable(data.cartridges);
+                })
+                .catch(error => console.error('Помилка:', error));
+        }
+
+        function updateTable(cartridges) {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+            cartridges.forEach(cartridge => {
+                const row = document.createElement('tr');
+                const statusClass = cartridge.status === 7 ? 'checkbox-red' : 'checkbox-empty';
+                row.innerHTML = `
+                    <td><div class="checkbox ${statusClass}" data-id="${cartridge.id}" data-serial="${cartridge.serial_num}"></div></td>
+                    <td>${cartridge.serial_num}</td>
+                    <td class="cartridge-model" title="${cartridge.cartridge_model || 'Не вказано'}">
+                        ${cartridge.cartridge_model || 'Не вказано'}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            scannedCartridges.clear();
+            document.getElementById('complete-btn').classList.add('disabled');
+        }
+
+        function startOver() {
+            scannedCartridges.clear();
+            serialModal.show();
+            document.getElementById('serial-input').focus();
+            document.getElementById('complete-btn').classList.remove('disabled');
+        }
+
+        async function submitSerial() {
+            const serial = document.getElementById('serial-input').value.trim();
+            if (!serial) {
+                alert('Введіть серійний номер!');
+                document.getElementById('serial-input').focus();
+                return;
+            }
+            const response = await fetch(`/api/getCartridge?serial=${serial}`);
+            const result = await response.json();
+            document.getElementById('serial-input').value = '';
+
+            if (result.error) {
+                alert(result.error);
+                document.getElementById('serial-input').focus();
+                return;
+            }
+
+            scannedCartridges.add(result.id);
+            const checkbox = document.querySelector(`.checkbox[data-id="${result.id}"]`);
+            if (checkbox) {
+                const color = result.curr_status in {1: true, 6: true, 7: true} ? 'checkbox-green' : 'checkbox-yellow';
+                checkbox.className = `checkbox ${color}`;
+            } else {
+                const tbody = document.getElementById('inventory-table-body');
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><div class="checkbox checkbox-yellow" data-id="${result.id}" data-serial="${result.serial_num}"></div></td>
+                    <td>${result.serial_num}</td>
+                    <td class="cartridge-model" title="${result.cartridge_model || 'Не вказано'}">
+                        ${result.cartridge_model || 'Не вказано'}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            }
+            document.getElementById('serial-input').focus();
+        }
+
+        function completeInventory() {
+            if (!confirm('Завершити інвентаризацію? Непроскановані картриджі будуть позначені як втрачені, а жовті — як на зберіганні (порожні).')) {
+                return;
+            }
+            const checkboxes = document.querySelectorAll('.checkbox');
+            checkboxes.forEach(checkbox => {
+                const id = parseInt(checkbox.getAttribute('data-id'));
+                if (!scannedCartridges.has(id)) {
+                    checkbox.className = 'checkbox checkbox-red';
+                    // TODO: Додати запит до сервера для оновлення статусу до 7 (Втрачений)
+                } else if (checkbox.classList.contains('checkbox-yellow')) {
+                    checkbox.className = 'checkbox checkbox-green';
+                    // TODO: Додати запит до сервера для оновлення статусу до 1 (На зберіганні порожній)
+                }
+            });
+            alert('Інвентаризацію завершено!');
+            document.getElementById('complete-btn').classList.add('disabled');
+            serialModal.hide();
+        }
+    </script>
+{% endblock %}

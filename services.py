@@ -98,8 +98,6 @@ def getStatusList():
     Returns:
         list: Список словників із полями status_id, status_name.
     """
-    from config import status_map
-
     data = [
         {"status_id": status_id, "status_name": status_name}
         for status_id, status_name in status_map.items()
@@ -107,3 +105,27 @@ def getStatusList():
 
     return data
 #-----------------------------------------------------------------------------------------------------------------------
+def getCartridgeData(serial: str) -> dict | None:
+    """
+    Отримує дані картриджа за серійним номером.
+
+    Args:
+        serial (str): Серійний номер картриджа.
+
+    Returns:
+        dict | None: Словник із даними картриджа або None, якщо не знайдено.
+    """
+    cartridge = db.session.query(Cartridges).filter_by(serial_num=serial).first()
+    if not cartridge:
+        return None
+
+    data = {
+        field: getattr(cartridge, field) if field != "time_updated"
+        else cartridge.time_updated.isoformat() if cartridge.time_updated else None
+        for field in [
+            "id", "serial_num", "in_printer", "cartridge_model", "cartrg_model_id",
+            "user_updated", "time_updated", "curr_status", "curr_dept", "curr_parcel_track"
+        ]
+    }
+
+    return data

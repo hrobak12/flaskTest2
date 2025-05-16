@@ -2704,6 +2704,14 @@ def decrement_service_balance(service_id):
         db.session.rollback()
         return jsonify({'message': f'Помилка: {str(e)}'}), 500
 
+
+@app.route('/inventory')
+@login_required
+@admin_required
+def inventory():
+    return render_template('inventory.html')
+
+
 #=============================================API=======================================================================
 #тут будуть нові маршрути, які будуть використовуватися з BluePrints
 #=============================================API=======================================================================
@@ -2788,7 +2796,27 @@ def get_statuses():
     statuses = getStatusList()
     return jsonify(statuses)
 #=======================================================================================================================
+@app.route('/api/getCartridge', methods=['GET'])
+@login_required
+def get_cartridge():
+    """
+    Отримує дані картриджа за серійним номером.
 
+    Args:
+        serial (str): Серійний номер картриджа, переданий як query parameter.
+
+    Returns:
+        JSON: Словник із даними картриджа або повідомлення про помилку, якщо картридж не знайдено.
+    """
+    serial = request.args.get('serial')
+    if not serial:
+        return jsonify({"error": "Серійний номер не вказано"}), 400
+
+    cartridge_data = getCartridgeData(serial)
+    if not cartridge_data:
+        return jsonify({"error": "Картридж не знайдено"}), 404
+    return jsonify(cartridge_data), 200
+#=======================================================================================================================
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
