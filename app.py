@@ -325,124 +325,6 @@ def delete_equipment(equip_id):
     flash('Обладнання видалено!')
     return redirect(url_for('equipments'))
 
-# CRUD для Cartridges
-@app.route('/cartridges')
-@login_required
-def cartridges():
-    search = request.args.get('search', '')
-    page = request.args.get('page', 1, type=int)  # Отримуємо номер сторінки з URL
-    per_page = 10  # Кількість записів на сторінці (можете змінити)
-
-    # Базовий запит із фільтром пошуку
-    query = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
-    # Додаємо пагінацію
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    cartridges = pagination.items  # Картриджі на поточній сторінці
-
-    return render_template('cartridges.html',
-                           RefillDept=RefillDept,
-                           CustomerEquipment=CustomerEquipment,
-                           PrinterModel=PrinterModel,
-                           cartridges=cartridges,
-                           CartridgeModel=CartridgeModel,
-                           search=search,
-                           pagination=pagination)
-
-
-@app.route('/add_cartridge', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def add_cartridge():
-    if request.method == 'POST':
-        serial_num = request.form['serial_num']
-        if Cartridges.query.filter_by(serial_num=serial_num).first():
-            flash('Картридж із таким серійним номером уже існує!')
-            return render_template('add_cartridge.html', RefillDept=RefillDept,
-                                                         PrinterModel=PrinterModel,
-                                                         CartridgeModel=CartridgeModel,
-                                                         equipments=CustomerEquipment.query.all())
-        in_printer = request.form['in_printer'] or None
-        cartridge_model = request.form['cartridge_model'] or None
-        cartrg_model_id = request.form['cartrg_model_id'] or None  # Нове поле
-        cartridge = Cartridges(
-            serial_num=serial_num,
-            in_printer=in_printer,
-            cartridge_model=cartridge_model,
-            cartrg_model_id=cartrg_model_id,  # Додаємо нове поле
-            user_updated=current_user.id
-        )
-        db.session.add(cartridge)
-        db.session.commit()
-        flash('Картридж додано!')
-        return redirect(url_for('cartridges'))
-    equipments = CustomerEquipment.query.all()
-    return render_template('add_cartridge.html', RefillDept=RefillDept,
-                                                 PrinterModel=PrinterModel,
-                                                 CartridgeModel=CartridgeModel,
-                                                 equipments=equipments)
-
-
-@app.route('/edit_cartridge/<int:cartridge_id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def edit_cartridge(cartridge_id):
-    cartridge = Cartridges.query.get_or_404(cartridge_id)
-    if request.method == 'POST':
-        serial_num = request.form['serial_num']
-        # Перевірка унікальності серійного номера
-        if Cartridges.query.filter(Cartridges.serial_num == serial_num, Cartridges.id != cartridge_id).first():
-            flash('Картридж із таким серійним номером уже існує!')
-            return render_template('edit_cartridge.html',
-                                   RefillDept=RefillDept,
-                                   PrinterModel=PrinterModel,
-                                   cartridge=cartridge,
-                                   CartridgeModel=CartridgeModel,
-                                   equipments=CustomerEquipment.query.all())
-
-        # Оновлення даних картриджа
-        cartridge.serial_num = serial_num
-        cartridge.in_printer = request.form['in_printer'] or None
-        cartridge.cartridge_model = request.form['cartridge_model'] or None
-        cartridge.cartrg_model_id = request.form['cartrg_model_id'] or None  # Нове поле
-        cartridge.user_updated = current_user.id
-        cartridge.time_updated = datetime.now()
-
-        # Додавання нової події в CartridgeStatus (якщо вказано статус)
-        if 'status' in request.form and request.form['status']:
-            new_status = CartridgeStatus(
-                cartridge_id=cartridge.id,
-                status=int(request.form['status']),
-                parcel_track=request.form.get('parcel_track') or None,
-                exec_dept=request.form.get('exec_dept') or None,
-                user_updated=current_user.id,
-                date_ofchange=datetime.now(),
-                time_updated=datetime.now()
-            )
-            db.session.add(new_status)
-
-        db.session.commit()
-        flash('Картридж оновлено та подію додано (якщо вказано статус)!')
-        return redirect(url_for('cartridges'))
-
-    equipments = CustomerEquipment.query.all()
-    return render_template('edit_cartridge.html',
-                           RefillDept=RefillDept,
-                           PrinterModel=PrinterModel,
-                           CartridgeModel=CartridgeModel,
-                           cartridge=cartridge,
-                           equipments=equipments)
-
-
-
-@app.route('/delete_cartridge/<int:cartridge_id>', methods=['POST'])
-@login_required
-@admin_required
-def delete_cartridge(cartridge_id):
-    cartridge = Cartridges.query.get_or_404(cartridge_id)
-    db.session.delete(cartridge)
-    db.session.commit()
-    flash('Картридж видалено!')
-    return redirect(url_for('cartridges'))
 
 # Відображення подій обробки картриджів та керування ними
 # Основний маршрут для відображення подій
@@ -2798,10 +2680,10 @@ def get_statuses():
     return jsonify(statuses)
 
 #=======================================================================================================================
-@app.route('/new_cartridges')
+@app.route('/cartridges')
 @login_required
 @admin_required
-def new_cartridges():
+def cartridges():
     search = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)  # Отримуємо номер сторінки з URL
     per_page = 10  # Кількість записів на сторінці (можете змінити)
@@ -2812,7 +2694,7 @@ def new_cartridges():
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     cartridges = pagination.items  # Картриджі на поточній сторінці
 
-    return render_template('new_cartridges.html',
+    return render_template('cartridges.html',
                            RefillDept=RefillDept,
                            CustomerEquipment=CustomerEquipment,
                            PrinterModel=PrinterModel,

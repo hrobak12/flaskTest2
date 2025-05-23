@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Картриджі{% endblock %}
+{% block title %}Картриджі (Новий шаблон){% endblock %}
 {% block content %}
     <h1>Список картриджів</h1>
 
-<!-- Модальне вікно для історії дій -->
+    <!-- Модальне вікно для історії дій -->
     <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -34,7 +34,107 @@
             </div>
         </div>
     </div>
-<!-- кінець модального вікна для історії дій -->
+
+    <!-- Модальне вікно для додавання картриджа -->
+    <div class="modal fade" id="addCartridgeModal" tabindex="-1" aria-labelledby="addCartridgeModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addCartridgeModalLabel">Додати картридж</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addCartridgeForm" method="post">
+                        <div class="mb-3">
+                            <label for="add_serial_num" class="form-label">Серійний номер</label>
+                            <input type="text" class="form-control" id="add_serial_num" name="serial_num" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_cartrg_model_id" class="form-label">Модель картриджа</label>
+                            <select class="form-select" id="add_cartrg_model_id" name="cartrg_model_id">
+                                <option value="">Не вибрано</option>
+                                {% for cartrg_model in CartridgeModel.query.all() %}
+                                    {% set printer_model = PrinterModel.query.get(cartrg_model.printer_model_id) %}
+                                    <option value="{{ cartrg_model.id }}">
+                                        {{ cartrg_model.model_name }} {% if printer_model %}({{ printer_model.model_name }}){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_in_printer" class="form-label">У принтері</label>
+                            <select class="form-select" id="add_in_printer" name="in_printer">
+                                <option value="">Немає</option>
+                                {% for equip in CustomerEquipment.query.all() %}
+                                    {% set model = PrinterModel.query.get(equip.print_model) %}
+                                    {% set dept = RefillDept.query.get(equip.print_dept) %}
+                                    <option value="{{ equip.id }}">
+                                        {{ model.model_name }} ({{ dept.deptname }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_use_counter" class="form-label">Лічильник використання</label>
+                            <input type="number" class="form-control" id="add_use_counter" name="use_counter" value="-1" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Додати</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальне вікно для редагування картриджа -->
+    <div class="modal fade" id="editCartridgeModal" tabindex="-1" aria-labelledby="editCartridgeModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editCartridgeModalLabel">Редагувати картридж</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editCartridgeForm" method="post">
+                        <input type="hidden" id="edit_cartridge_id" name="cartridge_id">
+                        <div class="mb-3">
+                            <label for="edit_serial_num" class="form-label">Серійний номер</label>
+                            <input type="text" class="form-control" id="edit_serial_num" name="serial_num" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_cartrg_model_id" class="form-label">Модель картриджа</label>
+                            <select class="form-select" id="edit_cartrg_model_id" name="cartrg_model_id">
+                                <option value="">Не вибрано</option>
+                                {% for cartrg_model in CartridgeModel.query.all() %}
+                                    {% set printer_model = PrinterModel.query.get(cartrg_model.printer_model_id) %}
+                                    <option value="{{ cartrg_model.id }}">
+                                        {{ cartrg_model.model_name }} {% if printer_model %}({{ printer_model.model_name }}){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_in_printer" class="form-label">У принтері</label>
+                            <select class="form-select" id="edit_in_printer" name="in_printer">
+                                <option value="">Немає</option>
+                                {% for equip in CustomerEquipment.query.all() %}
+                                    {% set model = PrinterModel.query.get(equip.print_model) %}
+                                    {% set dept = RefillDept.query.get(equip.print_dept) %}
+                                    <option value="{{ equip.id }}">
+                                        {{ model.model_name }} ({{ dept.deptname }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_use_counter" class="form-label">Лічильник використання</label>
+                            <input type="number" class="form-control" id="edit_use_counter" name="use_counter" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Оновити</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="mb-3 d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">
@@ -46,7 +146,7 @@
         <div>
             <a href="#" class="btn btn-warning me-2" onclick="printAllBarcodes(); return false;">Друк всіх наклейок</a>
             <a href="{{ url_for('export_cartridges_table') }}" class="btn btn-excel me-2">Звіт</a>
-            <a href="{{ url_for('add_cartridge') }}" class="btn btn-success me-2">Додати картридж</a>
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addCartridgeModal">Додати картридж</button>
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
         </div>
     </div>
@@ -54,11 +154,10 @@
     <table class="table table-striped" id="cartridge-table">
         <thead>
             <tr>
-                <th>ID</th>
                 <th>Серійний номер</th>
                 <th>Модель картриджа</th>
                 <th>У принтері</th>
-                <th>Поточний статус</th> <!-- Нова колонка -->
+                <th>Поточний статус</th>
                 <th>Дії</th>
             </tr>
         </thead>
@@ -106,6 +205,8 @@
         const searchInput = document.getElementById('search');
         const clearSearchBtn = document.getElementById('clear-search');
         const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+        const addCartridgeModal = new bootstrap.Modal(document.getElementById('addCartridgeModal'));
+        const editCartridgeModal = new bootstrap.Modal(document.getElementById('editCartridgeModal'));
         let statusMap = {};
 
         // Завантаження статусів при ініціалізації сторінки
@@ -122,7 +223,6 @@
                 })
                 .catch(error => {
                     console.error('Помилка завантаження статусів:', error);
-                    // Fallback: якщо не вдалося завантажити статуси, використовуємо порожній об'єкт
                     statusMap = {};
                     const initialSearch = searchInput.value.trim();
                     fetchCartridges(initialSearch, 1);
@@ -174,7 +274,6 @@
             cartridges.forEach(cartridge => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${cartridge.id}</td>
                     <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
                     <td class="cartridge-model" title="${cartridge.cartridge_model || 'Не вказано'}">
                         ${cartridge.cartridge_model || 'Не вказано'}
@@ -187,13 +286,43 @@
                     </td>
                     <td class="actions-column">
                         <a href="#" class="btn btn-warning btn-sm" onclick="generateBarcode(${cartridge.id}); return false;">Наклейка</a>
-                        <a href="/edit_cartridge/${cartridge.id}" class="btn btn-info btn-sm">Редагувати</a>
-                        <form action="/delete_cartridge/${cartridge.id}" method="POST" class="d-inline">
-                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені?')">Видалити</button>
-                        </form>
+                        <button class="btn btn-info btn-sm edit-btn" data-serial="${cartridge.serial_num}" data-bs-toggle="modal" data-bs-target="#editCartridgeModal">Редагувати</button>
+                        <button class="btn btn-danger btn-sm delete-btn" data-serial="${cartridge.serial_num}" onclick="deleteCartridge('${cartridge.serial_num}')">Видалити</button>
                     </td>
                 `;
                 tbody.appendChild(row);
+            });
+
+            // Додаємо обробники для кнопок редагування
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const serialNum = this.getAttribute('data-serial');
+                    fetch(`/api/getCartridge?serial=${encodeURIComponent(serialNum)}`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data) {
+                            document.getElementById('edit_cartridge_id').value = data.id;
+                            document.getElementById('edit_serial_num').value = data.serial_num;
+                            document.getElementById('edit_cartrg_model_id').value = data.cartrg_model_id || '';
+                            document.getElementById('edit_in_printer').value = data.in_printer || '';
+                            document.getElementById('edit_use_counter').value = data.use_counter;
+                        } else {
+                            alert('Картридж не знайдено');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Помилка:', error);
+                        alert('Помилка при отриманні даних картриджа');
+                    });
+                });
             });
         }
 
@@ -294,6 +423,85 @@
                 window.URL.revokeObjectURL(url);
             })
             .catch(error => console.error('Помилка:', error));
+        }
+
+        // Обробка форми додавання картриджа
+        document.getElementById('addCartridgeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/createCartridge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addCartridgeModal.hide();
+                    this.reset();
+                    fetchCartridges('', 1);
+                    alert('Картридж додано!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при додаванні картриджа');
+            });
+        });
+
+        // Обробка форми редагування картриджа
+        document.getElementById('editCartridgeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/modifyCartridge', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    editCartridgeModal.hide();
+                    fetchCartridges('', 1);
+                    alert('Картридж оновлено!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при редагуванні картриджа');
+            });
+        });
+
+        // Видалення картриджа
+        function deleteCartridge(serialNum) {
+            if (confirm('Ви впевнені, що хочете видалити цей картридж?')) {
+                fetch('/api/removeCartridge', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serial_num: serialNum })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        fetchCartridges('', 1);
+                        alert('Картридж видалено!');
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Помилка:', error);
+                    alert('Помилка при видаленні картриджа');
+                });
+            }
         }
     </script>
 {% endblock %}
