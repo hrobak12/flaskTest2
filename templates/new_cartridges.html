@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Картриджі{% endblock %}
+{% block title %}Картриджі (Новий шаблон){% endblock %}
 {% block content %}
     <h1>Список картриджів</h1>
 
@@ -227,312 +227,311 @@
 {% endblock %}
 
 {% block scripts %}
+    <script>
+        let timeout;
+        const searchInput = document.getElementById('search');
+        const clearSearchBtn = document.getElementById('clear-search');
+        const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+        const addCartridgeModal = new bootstrap.Modal(document.getElementById('addCartridgeModal'));
+        const editCartridgeModal = new bootstrap.Modal(document.getElementById('editCartridgeModal'));
+        let statusMap = {};
 
-<script>
-    let timeout;
-    const searchInput = document.getElementById('search');
-    const clearSearchBtn = document.getElementById('clear-search');
-    const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
-    const addCartridgeModal = new bootstrap.Modal(document.getElementById('addCartridgeModal'));
-    const editCartridgeModal = new bootstrap.Modal(document.getElementById('editCartridgeModal'));
-    let statusMap = {};
-
-    // Завантаження статусів при ініціалізації сторінки
-    window.addEventListener('DOMContentLoaded', (event) => {
-        fetch('/api/statuses')
-            .then(response => response.json())
-            .then(data => {
-                statusMap = data.reduce((map, status) => {
-                    map[status.status_id] = status.status_name;
-                    return map;
-                }, {});
-                const initialSearch = searchInput.value.trim();
-                fetchCartridges(initialSearch, 1);
-            })
-            .catch(error => {
-                console.error('Помилка завантаження статусів:', error);
-                statusMap = {};
-                const initialSearch = searchInput.value.trim();
-                fetchCartridges(initialSearch, 1);
-            });
-    });
-
-    // Обробка введення з debounce
-    searchInput.addEventListener('input', function() {
-        clearTimeout(timeout);
-        const searchValue = this.value.trim();
-        timeout = setTimeout(() => {
-            fetchCartridges(searchValue, 1);
-        }, 300);
-    });
-
-    // Обробка натискання кнопки очистки
-    clearSearchBtn.addEventListener('click', function() {
-        searchInput.value = '';
-        fetchCartridges('', 1);
-    });
-
-    // Очищення поля вводу при натисканні Esc
-    searchInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape' || event.keyCode === 27) {
-            searchInput.value = '';
-            fetchCartridges('', 1);
-        }
-    });
-
-    function fetchCartridges(search, page) {
-        const tbody = document.getElementById('cartridge-table-body');
-        fetch(`/api/cartridges?search=${encodeURIComponent(search)}&page=${page}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            updateTable(data.cartridges);
-            updatePagination(data.pagination);
-        })
-        .catch(error => console.error('Помилка:', error));
-    }
-
-    function updateTable(cartridges) {
-        const tbody = document.getElementById('cartridge-table-body');
-        tbody.innerHTML = '';
-        cartridges.forEach(cartridge => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
-                <td class="cartridge-model" title="${cartridge.cartrg_model_name || 'Не вказано'}">
-                    ${cartridge.cartrg_model_name || 'Не вказано'}
-                </td>
-                <td class="in-printer" title="${cartridge.in_printer_info || 'Немає'}">
-                    ${cartridge.in_printer_info || 'Немає'}
-                </td>
-                <td>
-                    ${statusMap[cartridge.curr_status] || 'Невідомий статус'}
-                </td>
-                <td class="actions-column">
-                    <a href="#" class="btn btn-warning btn-sm" onclick="generateBarcode(${cartridge.id}); return false;">Наклейка</a>
-                    <button class="btn btn-info btn-sm edit-btn" data-serial="${cartridge.serial_num}" data-bs-toggle="modal" data-bs-target="#editCartridgeModal">Редагувати</button>
-                    <button class="btn btn-danger btn-sm delete-btn" data-id="${cartridge.id}" onclick="deleteCartridge(${cartridge.id})">Видалити</button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
-
-        // Додаємо обробники для кнопок редагування
-        document.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const serialNum = this.getAttribute('data-serial');
-                fetch(`/api/getCartridge?serial=${encodeURIComponent(serialNum)}`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.json();
-                })
+        // Завантаження статусів при ініціалізації сторінки
+        window.addEventListener('DOMContentLoaded', (event) => {
+            fetch('/api/statuses')
+                .then(response => response.json())
                 .then(data => {
-                    if (data) {
-                        document.getElementById('edit_cartridge_id').value = data.id;
-                        document.getElementById('edit_serial_num').value = data.serial_num;
-                        document.getElementById('edit_cartrg_model_id').value = data.cartrg_model_id || '';
-                        document.getElementById('edit_in_printer').value = data.in_printer || '';
-                        document.getElementById('edit_use_counter').value = data.use_counter;
-                        document.getElementById('edit_status').value = '';
-                        document.getElementById('edit_parcel_track').value = '';
-                        document.getElementById('edit_exec_dept').value = '';
-                    } else {
-                        alert('Картридж не знайдено');
-                    }
+                    statusMap = data.reduce((map, status) => {
+                        map[status.status_id] = status.status_name;
+                        return map;
+                    }, {});
+                    const initialSearch = searchInput.value.trim();
+                    fetchCartridges(initialSearch, 1);
                 })
                 .catch(error => {
-                    console.error('Помилка:', error);
-                    alert('Помилка при отриманні даних картриджа');
+                    console.error('Помилка завантаження статусів:', error);
+                    statusMap = {};
+                    const initialSearch = searchInput.value.trim();
+                    fetchCartridges(initialSearch, 1);
+                });
+        });
+
+        // Обробка введення з debounce
+        searchInput.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const searchValue = this.value.trim();
+            timeout = setTimeout(() => {
+                fetchCartridges(searchValue, 1);
+            }, 300);
+        });
+
+        // Обробка натискання кнопки очистки
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            fetchCartridges('', 1);
+        });
+
+        // Очищення поля вводу при натисканні Esc
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' || event.keyCode === 27) {
+                searchInput.value = '';
+                fetchCartridges('', 1);
+            }
+        });
+
+        function fetchCartridges(search, page) {
+            const tbody = document.getElementById('cartridge-table-body');
+            fetch(`/api/cartridges?search=${encodeURIComponent(search)}&page=${page}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateTable(data.cartridges);
+                updatePagination(data.pagination);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function updateTable(cartridges) {
+            const tbody = document.getElementById('cartridge-table-body');
+            tbody.innerHTML = '';
+            cartridges.forEach(cartridge => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
+                    <td class="cartridge-model" title="${cartridge.cartrg_model_name || 'Не вказано'}">
+                        ${cartridge.cartrg_model_name || 'Не вказано'}
+                    </td>
+                    <td class="in-printer" title="${cartridge.in_printer_info || 'Немає'}">
+                        ${cartridge.in_printer_info || 'Немає'}
+                    </td>
+                    <td>
+                        ${statusMap[cartridge.curr_status] || 'Невідомий статус'}
+                    </td>
+                    <td class="actions-column">
+                        <a href="#" class="btn btn-warning btn-sm" onclick="generateBarcode(${cartridge.id}); return false;">Наклейка</a>
+                        <button class="btn btn-info btn-sm edit-btn" data-serial="${cartridge.serial_num}" data-bs-toggle="modal" data-bs-target="#editCartridgeModal">Редагувати</button>
+                        <button class="btn btn-danger btn-sm delete-btn" data-serial="${cartridge.serial_num}" onclick="deleteCartridge('${cartridge.serial_num}')">Видалити</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Додаємо обробники для кнопок редагування
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const serialNum = this.getAttribute('data-serial');
+                    fetch(`/api/getCartridge?serial_num=${encodeURIComponent(serialNum)}`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data) {
+                            document.getElementById('edit_cartridge_id').value = data.id;
+                            document.getElementById('edit_serial_num').value = data.serial_num;
+                            document.getElementById('edit_cartrg_model_id').value = data.cartrg_model_id || '';
+                            document.getElementById('edit_in_printer').value = data.in_printer || '';
+                            document.getElementById('edit_use_counter').value = data.use_counter;
+                            document.getElementById('edit_status').value = '';
+                            document.getElementById('edit_parcel_track').value = '';
+                            document.getElementById('edit_exec_dept').value = '';
+                        } else {
+                            alert('Картридж не знайдено');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Помилка:', error);
+                        alert('Помилка при отриманні даних картриджа');
+                    });
                 });
             });
-        });
-    }
-
-    function updatePagination(pagination) {
-        const paginationUl = document.getElementById('pagination');
-        paginationUl.innerHTML = '';
-
-        if (pagination.has_prev) {
-            paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${pagination.prev_num}); return false;">Попередня</a></li>`;
-        } else {
-            paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Попередня</span></li>`;
         }
 
-        pagination.pages.forEach(page => {
-            if (page === null) {
-                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-            } else if (page === pagination.current_page) {
-                paginationUl.innerHTML += `<li class="page-item active"><span class="page-link">${page}</span></li>`;
-            } else {
-                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${page}); return false;">${page}</a></li>`;
-            }
-        });
+        function updatePagination(pagination) {
+            const paginationUl = document.getElementById('pagination');
+            paginationUl.innerHTML = '';
 
-        if (pagination.has_next) {
-            paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${pagination.next_num}); return false;">Наступна</a></li>`;
-        } else {
-            paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Наступна</span></li>`;
+            if (pagination.has_prev) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${pagination.prev_num}); return false;">Попередня</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Попередня</span></li>`;
+            }
+
+            pagination.pages.forEach(page => {
+                if (page === null) {
+                    paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                } else if (page === pagination.current_page) {
+                    paginationUl.innerHTML += `<li class="page-item active"><span class="page-link">${page}</span></li>`;
+                } else {
+                    paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${page}); return false;">${page}</a></li>`;
+                }
+            });
+
+            if (pagination.has_next) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchCartridges('${pagination.search}', ${pagination.next_num}); return false;">Наступна</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Наступна</span></li>`;
+            }
         }
-    }
 
-    // Показ історії
-    function showHistory(cartridgeId) {
-        fetch(`/api/cartridge_history/${cartridgeId}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(response => response.json())
-        .then(data => {
-            updateHistoryTable(data.history);
-            const exportBtn = document.getElementById('exportHistoryBtn');
-            exportBtn.href = `/export/cartridge_history/${cartridgeId}`;
-            historyModal.show();
-        })
-        .catch(error => console.error('Помилка:', error));
-    }
-
-    // Оновлення таблиці історії
-    function updateHistoryTable(history) {
-        const tbody = document.getElementById('history-table-body');
-        tbody.innerHTML = '';
-        history.forEach(event => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${new Date(event.date_ofchange).toLocaleString()}</td>
-                <td>${statusMap[event.status] || 'Невідомий'}</td>
-                <td>${event.dept_name || 'Не вказано'}</td>
-                <td>${event.parcel_track || 'Не вказано'}</td>
-                <td>${event.user_login || 'Не вказано'}</td>
-            `;
-            tbody.appendChild(row);
-        });
-    }
-
-    function generateBarcode(cartridgeId) {
-        fetch(`/api/barcode/${cartridgeId}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/pdf' }
-        })
-        .then(response => response.blob())
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `barcode_${cartridgeId}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-        })
-        .catch(error => console.error('Помилка:', error));
-    }
-
-    function printAllBarcodes() {
-        const searchValue = document.getElementById('search').value.trim();
-        fetch(`/api/barcodes_all?search=${encodeURIComponent(searchValue)}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/pdf' }
-        })
-        .then(response => response.blob())
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `all_barcodes_${new Date().toISOString().slice(0,10)}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-        })
-        .catch(error => console.error('Помилка:', error));
-    }
-
-    // Обробка форми додавання картриджа
-    document.getElementById('addCartridgeForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData);
-
-        fetch('/api/createCartridge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                addCartridgeModal.hide();
-                this.reset();
-                fetchCartridges('', 1);
-                alert('Картридж додано!');
-            } else {
-                alert(data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Помилка:', error);
-            alert('Помилка при додаванні картриджа');
-        });
-    });
-
-    // Обробка форми редагування картриджа
-    document.getElementById('editCartridgeForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData);
-
-        fetch(`/edit_cartridge/${data.cartridge_id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                editCartridgeModal.hide();
-                fetchCartridges('', 1);
-                alert('Картридж оновлено!');
-            } else {
-                alert(data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Помилка:', error);
-            alert('Помилка при редагуванні картриджа');
-        });
-    });
-
-    // Видалення картриджа
-    function deleteCartridge(cartridgeId) {
-        if (confirm('Ви впевнені, що хочете видалити цей картридж?')) {
-            fetch(`/delete_cartridge/${cartridgeId}`, {
-                method: 'POST',
+        // Показ історії
+        function showHistory(cartridgeId) {
+            fetch(`/api/cartridge_history/${cartridgeId}`, {
+                method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             })
             .then(response => response.json())
             .then(data => {
+                updateHistoryTable(data.history);
+                const exportBtn = document.getElementById('exportHistoryBtn');
+                exportBtn.href = `/export/cartridge_history/${cartridgeId}`;
+                historyModal.show();
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        // Оновлення таблиці історії
+        function updateHistoryTable(history) {
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+            history.forEach(event => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(event.date_ofchange).toLocaleString()}</td>
+                    <td>${statusMap[event.status] || 'Невідомий'}</td>
+                    <td>${event.dept_name || 'Не вказано'}</td>
+                    <td>${event.parcel_track || 'Не вказано'}</td>
+                    <td>${event.user_login || 'Не вказано'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function generateBarcode(cartridgeId) {
+            fetch(`/api/barcode/${cartridgeId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/pdf' }
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `barcode_${cartridgeId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        function printAllBarcodes() {
+            const searchValue = document.getElementById('search').value.trim();
+            fetch(`/api/barcodes_all?search=${encodeURIComponent(searchValue)}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/pdf' }
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `all_barcodes_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        // Обробка форми додавання картриджа
+        document.getElementById('addCartridgeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/createCartridge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
                 if (data.success) {
+                    addCartridgeModal.hide();
+                    this.reset();
                     fetchCartridges('', 1);
-                    alert('Картридж видалено!');
+                    alert('Картридж додано!');
                 } else {
                     alert(data.message);
                 }
             })
             .catch(error => {
                 console.error('Помилка:', error);
-                alert('Помилка при видаленні картриджа');
+                alert('Помилка при додаванні картриджа');
             });
-        }
-    }
-</script>
+        });
 
+        // Обробка форми редагування картриджа
+        document.getElementById('editCartridgeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch(`/edit_cartridge/${data.cartridge_id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    editCartridgeModal.hide();
+                    fetchCartridges('', 1);
+                    alert('Картридж оновлено!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при редагуванні картриджа');
+            });
+        });
+
+        // Видалення картриджа
+        function deleteCartridge(serialNum) {
+            if (confirm('Ви впевнені, що хочете видалити цей картридж?')) {
+                fetch('/api/removeCartridge', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serial_num: serialNum })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        fetchCartridges('', 1);
+                        alert('Картридж видалено!');
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Помилка:', error);
+                    alert('Помилка при видаленні картриджа');
+                });
+            }
+        }
+    </script>
 {% endblock %}

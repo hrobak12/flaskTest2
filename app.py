@@ -2865,8 +2865,29 @@ def create_cartridge():
         return jsonify({"success": True, "message": result["message"]}), 200
     return jsonify({"success": False, "message": result["message"]}), 400
 #=======================================================================================================================
+@app.route('/api/removeCartridge', methods=['DELETE'])
+@login_required
+@admin_required
+def remove_cartridge():
+    """
+    Видаляє картридж за серійним номером.
 
+    Args:
+        JSON body: Словник із полем serial_num.
 
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    serial_num = data.get('serial_num') if data else None
+    if not serial_num:
+        return jsonify({"success": False, "message": "Серійний номер не вказано"}), 400
+
+    result = removeCartridgeData(serial_num)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 404
+#=======================================================================================================================
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

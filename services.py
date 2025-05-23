@@ -187,3 +187,25 @@ def createCartridgeData(data, user_id):
         db.session.rollback()
         return {"success": False, "message": f"Помилка: {str(e)}"}
 # -----------------------------------------------------------------------------------------------------------------------
+def removeCartridgeData(serial: str) -> dict:
+    """
+    Видаляє картридж за серійним номером.
+
+    Args:
+        serial (str): Серійний номер картриджа.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        cartridge = Cartridges.query.filter_by(serial_num=serial).first()
+        if not cartridge:
+            return {"success": False, "message": "Картридж не знайдено"}
+
+        db.session.delete(cartridge)
+        db.session.commit()
+        return {"success": True, "message": "Картридж видалено успішно"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+# -----------------------------------------------------------------------------------------------------------------------
