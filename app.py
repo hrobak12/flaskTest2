@@ -344,6 +344,7 @@ def cartridges():
                            CustomerEquipment=CustomerEquipment,
                            PrinterModel=PrinterModel,
                            cartridges=cartridges,
+                           CartridgeModel=CartridgeModel,
                            search=search,
                            pagination=pagination)
 
@@ -1414,8 +1415,8 @@ def api_report_period():
                       .filter(CartridgeStatus.date_ofchange.between(start_date, end_date))
 
     # Фільтр для не-адмінів
-    if current_user.role != 'admin':  # Перевіряємо роль замість is_admin
-        query = query.filter(CartridgeStatus.user_updated == current_user.id)
+#    if current_user.role != 'admin':  # Перевіряємо роль замість is_admin
+#        query = query.filter(CartridgeStatus.user_updated == current_user.id)
 
     # Виконуємо запит і формуємо дані
     report_data = []
@@ -1748,10 +1749,10 @@ def update_cartridge_barcodes():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@app.route('/testCartridge', methods=['GET'])
+@app.route('/dashboard', methods=['GET'])
 @login_required
 def test_cartridges():
-    return render_template('testCartridge.html', RefillDept=RefillDept)
+    return render_template('dashboard.html', RefillDept=RefillDept)
 
 
 #----------------------------------------------------------------
@@ -2796,6 +2797,31 @@ def get_statuses():
     statuses = getStatusList()
     return jsonify(statuses)
 #=======================================================================================================================
+@app.route('/new_cartridges')
+@login_required
+@admin_required
+def new_cartridges():
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)  # Отримуємо номер сторінки з URL
+    per_page = 10  # Кількість записів на сторінці (можете змінити)
+
+    # Базовий запит із фільтром пошуку
+    query = Cartridges.query.filter(Cartridges.serial_num.ilike(f'%{search}%'))
+    # Додаємо пагінацію
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    cartridges = pagination.items  # Картриджі на поточній сторінці
+
+    return render_template('new_cartridges.html',
+                           RefillDept=RefillDept,
+                           CustomerEquipment=CustomerEquipment,
+                           PrinterModel=PrinterModel,
+                           cartridges=cartridges,
+                           CartridgeModel=CartridgeModel,
+                           search=search,
+                           pagination=pagination)
+
+
+
 @app.route('/api/getCartridge', methods=['GET'])
 @login_required
 def get_cartridge():
@@ -2817,6 +2843,30 @@ def get_cartridge():
         return jsonify({"error": "Картридж не знайдено"}), 404
     return jsonify(cartridge_data), 200
 #=======================================================================================================================
+@app.route('/api/createCartridge', methods=['POST'])
+@login_required
+@admin_required
+def create_cartridge():
+    """
+    Створює новий картридж у базі даних.
+
+    Args:
+        JSON body: Словник із полями serial_num, cartrg_model_id, in_printer, use_counter.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = createCartridgeData(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+#=======================================================================================================================
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -256,6 +256,61 @@
             border: 1px solid rgba(255, 255, 255, 0.3);
             white-space: nowrap;
         }
+
+
+
+    .modal-content {
+        background-color: #fff;
+        margin: 5% auto; /* Центрування по вертикалі та горизонталі */
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 90%; /* Максимальна ширина модального вікна */
+        max-height: 80vh; /* Максимальна висота відносно висоти екрану */
+        width: 600px; /* Фіксована ширина, можна змінити */
+        overflow-y: auto; /* Прокрутка по вертикалі, якщо вміст не вміщається */
+        box-sizing: border-box; /* Враховувати padding і border у розмірах */
+        position: relative;
+    }
+
+    /* Обмеження для зображень */
+    .modal-content img {
+        max-width: 100%; /* Зображення не виходить за межі контейнера */
+        height: auto; /* Зберігає пропорції */
+        display: block;
+        margin: 0 auto; /* Центрування зображень */
+    }
+
+    /* Стилі для тексту */
+    .modal-content p, .modal-content div {
+        word-wrap: break-word; /* Перенос довгих слів */
+        max-width: 100%; /* Текст не виходить за межі */
+    }
+
+    /* Кнопка закриття */
+    .modal-content .close {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 20px;
+        cursor: pointer;
+    }
+
+    /* Для списків і таблиць у модальному вікні */
+    .modal-content ul, .modal-content table {
+        max-width: 100%;
+        overflow-x: auto; /* Горизонтальна прокрутка для таблиць */
+    }
+
+    /* Адаптивність для маленьких екранів */
+    @media (max-width: 600px) {
+        .modal-content {
+            width: 95%;
+            margin: 10% auto;
+        }
+    }
+
+
+
     </style>
     {% endblock %}
 </head>
@@ -275,12 +330,7 @@
                 </h2>
                 <div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#accordionSidebar">
                     <div class="accordion-body">
-                        <button class="accordion-item-action">Видача заправлених</button>
-                        <button class="accordion-item-action">Приймання порожніх</button>
-                        <button class="accordion-item-action">Відправка на заправку</button>
-                        <button class="accordion-item-action">Приймання заправлених</button>
-                        <hr>
-                        <button class="accordion-item-action">Індивідуальна обробка</button>
+                        <button class="accordion-item-action" id="processing-button">Робота з картриджами</button>
                     </div>
                 </div>
             </div>
@@ -339,7 +389,7 @@
     <!-- Main Content -->
     {% block content %}
     <div class="main-content">
-        <h3>Загальні відомості</h3>
+        <h3>Панель керування</h3>
         <!-- Перший рядок: Порожні та Заправлені картриджі -->
         <div class="row">
             <!-- Ліва колонка: Порожні картриджі та Картриджі в дорозі -->
@@ -395,6 +445,7 @@
             </div>
         </div>
         <!-- Другий рядок: Статистика -->
+        <!--
         <div class="row">
             <div class="col-md-6 mb-4">
                 <div class="card p-4">
@@ -408,6 +459,7 @@
                 </div>
             </div>
         </div>
+        -->
     </div>
     {% endblock %}
 
@@ -442,6 +494,97 @@
         </div>
     </div>
 
+    <!-- Модальне вікно for operations-->
+    <div class="modal fade" id="processModal" tabindex="-1" aria-labelledby="processModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content history">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="processModalLabel">Робота з картриджами</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="operation-selector" class="row text-center">
+                        <div class="col-12 col-md-4 mb-4 card modal-option" onclick="alert('не реалізовано 1')">
+                            <img src="/static/move_1.png" alt="move 1">
+                            <div class="mt-2">Видача заправлених користувачам</div>
+                        </div>
+                        <div class="col-12 col-md-4 mb-4 card modal-option" onclick="alert('не реалізовано 2')">
+                            <img src="/static/move_2.png" alt="move 2">
+                            <div class="mt-2">Отримання порожніх та відправка на заправку</div>
+                        </div>
+                        <div class="col-12 col-md-4 mb-4 card modal-option" onclick="alert('не реалізовано 3')">
+                            <img src="/static/move_3.png" alt="move 3">
+                            <div class="mt-2">Отримання заправлених від підрядника</div>
+                        </div>
+                    </div>
+                    <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                    <form id="massInputForm">
+                        <input type="hidden" id="operation_type" name="operation_type">
+                        <input type="hidden" id="status" name="status">
+                        <div class="mb-3 position-relative" style="display: none;">
+                            <label for="serial_num" class="form-label">Введіть або відскануйте серійний номер</label>
+                            <input type="text" class="form-control" id="serial_num" name="serial_num"
+                                   placeholder="Серійний номер" required autofocus>
+                            <div id="serial-suggestions" class="dropdown-menu w-100" style="max-height: 220px; overflow-y: auto;"></div>
+                        </div>
+                        <div class="mb-3" id="status_field" style="display: none;">
+                            <label for="status_select" class="form-label">Статус</label>
+                            <select class="form-select" id="status_select" name="status_select">
+                                <option value="">Завантаження статусів...</option>
+                            </select>
+                        </div>
+                        <div class="card" id="cartridge_table" style="display: none;">
+                            <div class="card-body p-0">
+                                <div style="max-height: 300px; overflow-y: auto;">
+                                    <table class="table table-striped mb-0" id="mass-input-table">
+                                        <thead class="sticky-header">
+                                        <tr>
+                                            <th class="col-serial">Серійний номер</th>
+                                            <th class="col-model">Модель картриджа</th>
+                                            <th class="col-date">Дата/Час</th>
+                                            <th class="col-action">Дія</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody id="mass-input-table-body">
+                                        <!-- Дані додаються через JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3" style="display: none;">
+                            <label for="exec_dept" class="form-label">Відділ</label>
+                            <select class="form-select" id="exec_dept" name="exec_dept" required>
+                                <option value="">Виберіть відділ</option>
+                                {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
+                                <option value="{{ dept.id }}">{{ dept.deptname }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mt-3" id="printer_field" style="display: none;">
+                            <label for="printer" class="form-label">Принтер</label>
+                            <select class="form-select" id="printer" name="printer" disabled>
+                                <option value="">Спочатку виберіть відділ</option>
+                            </select>
+                        </div>
+                        <div class="mt-3" id="parcel_track_field" style="display: none;">
+                            <label for="parcel_track" class="form-label">Трек-номер (необов’язково)</label>
+                            <input type="text" class="form-control" id="parcel_track" name="parcel_track" maxlength="13"
+                                   placeholder="Трек-номер">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="display: none;">
+                    <button type="button" class="btn btn-ukrposhta me-auto" id="printLabelBtn" style="display: none;">
+                        Друкувати ярлик
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                    <button type="button" class="btn btn-primary" id="confirmMassInput">Підтвердити</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
     <!-- Scripts -->
     {% block scripts %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -711,6 +854,13 @@
             loadCartridgesByModel('/api/cartridges_by_status?status_list=6&status_sort=desc', 'filled-cartridges-table', 'filled-spinner', 'filled-no-data');
             loadCartridgesInTransit('/api/cartridges_by_status?status_list=3&status_sort=desc', 'transit-cartridges-table', 'transit-spinner', 'transit-no-data');
         });
+
+        // Show modal when clicking "Обробка"
+        document.getElementById('processing-button').addEventListener('click', () => {
+                const modal = new bootstrap.Modal(document.getElementById('processModal'));
+                modal.show();
+        });
+
     </script>
     {% endblock %}
 </body>

@@ -124,8 +124,66 @@ def getCartridgeData(serial: str) -> dict | None:
         else cartridge.time_updated.isoformat() if cartridge.time_updated else None
         for field in [
             "id", "serial_num", "in_printer", "cartridge_model", "cartrg_model_id",
-            "user_updated", "time_updated", "curr_status", "curr_dept", "curr_parcel_track"
+            "user_updated", "time_updated", "curr_status", "curr_dept", "curr_parcel_track", "use_counter"
         ]
     }
 
     return data
+#-----------------------------------------------------------------------------------------------------------------------
+def createCartridgeData(data, user_id):
+    """
+    Створює новий картридж у базі даних.
+
+    Args:
+        data (dict): Словник із полями serial_num, cartrg_model_id, in_printer, use_counter.
+        user_id (int): ID користувача, який створює картридж.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        # Валідація обов’язкових полів
+        serial_num = data.get("serial_num")
+        if not serial_num:
+            return {"success": False, "message": "Серійний номер обов’язковий"}
+
+        # Перевірка унікальності serial_num
+        if Cartridges.query.filter_by(serial_num=serial_num).first():
+            return {"success": False, "message": "Картридж із таким серійним номером уже існує"}
+
+        # Валідація cartrg_model_id
+        cartrg_model_id = data.get("cartrg_model_id")
+        if cartrg_model_id and not CartridgeModel.query.get(cartrg_model_id):
+            return {"success": False, "message": "Недійсна модель картриджа"}
+
+        # Валідація in_printer
+        in_printer = data.get("in_printer")
+        if in_printer and not CustomerEquipment.query.get(in_printer):
+            return {"success": False, "message": "Недійсний принтер"}
+
+        # Валідація user_id
+        if not user_id or not User.query.get(user_id):
+            return {"success": False, "message": "Недійсний користувач"}
+
+        # Створення картриджа
+        cartridge = Cartridges(
+            serial_num=serial_num,
+            cartrg_model_id=cartrg_model_id if cartrg_model_id else None,
+            in_printer=in_printer if in_printer else None,
+            use_counter=int(data.get("use_counter", -1)),
+            curr_status=0,  # За замовчуванням "Не вказано"
+            user_updated=user_id,
+            time_updated=datetime.utcnow()
+        )
+
+        db.session.add(cartridge)
+        db.session.commit()
+        return {"success": True, "message": "Картридж створено успішно"}
+
+    except IntegrityError:
+        db.session.rollback()
+        return {"success": False, "message": "Помилка: порушення унікальності даних"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+# -----------------------------------------------------------------------------------------------------------------------

@@ -56,9 +56,10 @@
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownStats" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Статистика
+                                Адміністрування
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="navbarDropdownStats">
+                                <li><a class="dropdown-item" href="{{ url_for('inventory') }}">Інвентаризація</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('cartridge_status') }}">Події обробки</a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('event_log') }}">Логи</a></li>
                             </ul>
