@@ -2796,6 +2796,7 @@ def get_statuses():
     """
     statuses = getStatusList()
     return jsonify(statuses)
+
 #=======================================================================================================================
 @app.route('/new_cartridges')
 @login_required
@@ -2888,6 +2889,28 @@ def remove_cartridge():
         return jsonify({"success": True, "message": result["message"]}), 200
     return jsonify({"success": False, "message": result["message"]}), 404
 #=======================================================================================================================
+@app.route('/api/modifyCartridge', methods=['PATCH'])
+@login_required
+def modify_cartridge():
+    """
+    Оновлює дані картриджа.
+
+    Args:
+        JSON body: Словник із полями cartridge_id, serial_num, cartrg_model_id, in_printer, use_counter.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = modifyCartridgeData(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+#=======================================================================================================================
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

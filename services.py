@@ -1,6 +1,8 @@
 from sqlalchemy import asc, desc
+from sqlalchemy.exc import IntegrityError
 from models import *
 from config import status_map
+from datetime import datetime
 
 #-----------------------------------------------------------------------------------------------------------------------
 def getDepartmentsList(is_exec=None, order='asc'):
@@ -205,6 +207,66 @@ def removeCartridgeData(serial: str) -> dict:
         db.session.delete(cartridge)
         db.session.commit()
         return {"success": True, "message": "Картридж видалено успішно"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+# -----------------------------------------------------------------------------------------------------------------------
+def modifyCartridgeData(data: dict, user_id: int) -> dict:
+    """
+    Оновлює дані картриджа в базі даних.
+
+    Args:
+        data (dict): Словник із полями cartridge_id, serial_num, cartrg_model_id, in_printer, use_counter.
+        user_id (int): ID користувача, який оновлює картридж.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        # Валідація обов’язкових полів
+        cartridge_id = data.get("cartridge_id")
+        serial_num = data.get("serial_num")
+        if not cartridge_id or not serial_num:
+            return {"success": False, "message": "ID картриджа та серійний номер обов’язкові"}
+
+        # Перевірка існування картриджа
+        cartridge = Cartridges.query.get(cartridge_id)
+        if not cartridge:
+            return {"success": False, "message": "Картридж не знайдено"}
+
+        # Перевірка унікальності serial_num (якщо змінюється)
+        if serial_num != cartridge.serial_num:
+            if Cartridges.query.filter_by(serial_num=serial_num).first():
+                return {"success": False, "message": "Картридж із таким серійним номером уже існує"}
+
+        # Валідація cartrg_model_id
+        cartrg_model_id = data.get("cartrg_model_id")
+        if cartrg_model_id and not CartridgeModel.query.get(cartrg_model_id):
+            return {"success": False, "message": "Недійсна модель картриджа"}
+
+        # Валідація in_printer
+        in_printer = data.get("in_printer")
+        if in_printer and not CustomerEquipment.query.get(in_printer):
+            return {"success": False, "message": "Недійсний принтер"}
+
+        # Валідація user_id
+        if not user_id or not User.query.get(user_id):
+            return {"success": False, "message": "Недійсний користувач"}
+
+        # Оновлення полів
+        cartridge.serial_num = serial_num
+        cartridge.cartrg_model_id = cartrg_model_id if cartrg_model_id else None
+        cartridge.in_printer = in_printer if in_printer else None
+        cartridge.use_counter = int(data.get("use_counter", -1))
+        cartridge.user_updated = user_id
+        cartridge.time_updated = datetime.utcnow()
+
+        db.session.commit()
+        return {"success": True, "message": "Картридж оновлено успішно"}
+
+    except IntegrityError:
+        db.session.rollback()
+        return {"success": False, "message": "Помилка: порушення унікальності даних"}
     except Exception as e:
         db.session.rollback()
         return {"success": False, "message": f"Помилка: {str(e)}"}

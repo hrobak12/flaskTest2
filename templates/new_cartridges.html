@@ -129,33 +129,6 @@
                             <label for="edit_use_counter" class="form-label">Лічильник використання</label>
                             <input type="number" class="form-control" id="edit_use_counter" name="use_counter" required>
                         </div>
-                        <h3>Додати подію</h3>
-                        <div class="mb-3">
-                            <label for="edit_status" class="form-label">Статус</label>
-                            <select class="form-select" id="edit_status" name="status">
-                                <option value="">Не додавати подію</option>
-                                <option value="0">Не вказано</option>
-                                <option value="1">На зберіганні (порожній)</option>
-                                <option value="2">Відправлено в користування</option>
-                                <option value="3">Відправлено на заправку</option>
-                                <option value="4">Непридатний (списаний)</option>
-                                <option value="5">Одноразовий (фарба у банці)</option>
-                                <option value="6">На зберіганні (заправлений)</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_parcel_track" class="form-label">Трек-номер (необов’язково)</label>
-                            <input type="text" class="form-control" id="edit_parcel_track" name="parcel_track" maxlength="13">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_exec_dept" class="form-label">Відділ (необов’язково)</label>
-                            <select class="form-select" id="edit_exec_dept" name="exec_dept">
-                                <option value="">Не вказано</option>
-                                {% for dept in RefillDept.query.all() %}
-                                    <option value="{{ dept.id }}">{{ dept.deptname }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
                         <button type="submit" class="btn btn-primary">Оновити</button>
                     </form>
                 </div>
@@ -302,8 +275,8 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td><a href="#" class="serial-link" data-cartridge-id="${cartridge.id}" onclick="showHistory(${cartridge.id}); return false;">${cartridge.serial_num}</a></td>
-                    <td class="cartridge-model" title="${cartridge.cartrg_model_name || 'Не вказано'}">
-                        ${cartridge.cartrg_model_name || 'Не вказано'}
+                    <td class="cartridge-model" title="${cartridge.cartridge_model || 'Не вказано'}">
+                        ${cartridge.cartridge_model || 'Не вказано'}
                     </td>
                     <td class="in-printer" title="${cartridge.in_printer_info || 'Немає'}">
                         ${cartridge.in_printer_info || 'Немає'}
@@ -324,7 +297,7 @@
             document.querySelectorAll('.edit-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const serialNum = this.getAttribute('data-serial');
-                    fetch(`/api/getCartridge?serial_num=${encodeURIComponent(serialNum)}`, {
+                    fetch(`/api/getCartridge?serial=${encodeURIComponent(serialNum)}`, {
                         method: 'GET',
                         headers: { 'Content-Type': 'application/json' }
                     })
@@ -341,9 +314,6 @@
                             document.getElementById('edit_cartrg_model_id').value = data.cartrg_model_id || '';
                             document.getElementById('edit_in_printer').value = data.in_printer || '';
                             document.getElementById('edit_use_counter').value = data.use_counter;
-                            document.getElementById('edit_status').value = '';
-                            document.getElementById('edit_parcel_track').value = '';
-                            document.getElementById('edit_exec_dept').value = '';
                         } else {
                             alert('Картридж не знайдено');
                         }
@@ -489,8 +459,8 @@
             const formData = new FormData(this);
             const data = Object.fromEntries(formData);
 
-            fetch(`/edit_cartridge/${data.cartridge_id}`, {
-                method: 'POST',
+            fetch('/api/modifyCartridge', {
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             })
