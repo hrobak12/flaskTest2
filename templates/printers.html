@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+{% block title %}Принтери{% endblock %}
+{% block content %}
+    <h1>Список принтерів</h1>
+
+    <!-- Модальне вікно для додавання принтера -->
+    <div class="modal fade" id="addPrinterModal" tabindex="-1" aria-labelledby="addPrinterModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addPrinterModalLabel">Додати принтер</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addPrinterForm" method="post">
+                        <div class="mb-3">
+                            <label for="add_serial_num" class="form-label">Серійний номер</label>
+                            <input type="text" class="form-control" id="add_serial_num" name="serial_num" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_inventory_num" class="form-label">Інвентарний номер</label>
+                            <input type="text" class="form-control" id="add_inventory_num" name="inventory_num" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_print_model" class="form-label">Модель принтера</label>
+                            <select class="form-select" id="add_print_model" name="print_model" required>
+                                <option value="">Не вибрано</option>
+                                {% for model in PrinterModel.query.all() %}
+                                    <option value="{{ model.id }}">{{ model.model_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_print_dept" class="form-label">Відділ</label>
+                            <select class="form-select" id="add_print_dept" name="print_dept" required>
+                                <option value="">Не вибрано</option>
+                                {% for dept in RefillDept.query.all() %}
+                                    <option value="{{ dept.id }}">{{ dept.deptname }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Додати</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальне вікно для редагування принтера -->
+    <div class="modal fade" id="editPrinterModal" tabindex="-1" aria-labelledby="editPrinterModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editPrinterModalLabel">Редагувати принтер</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editPrinterForm" method="post">
+                        <input type="hidden" id="edit_printer_id" name="printer_id">
+                        <div class="mb-3">
+                            <label for="edit_serial_num" class="form-label">Серійний номер</label>
+                            <input type="text" class="form-control" id="edit_serial_num" name="serial_num" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_inventory_num" class="form-label">Інвентарний номер</label>
+                            <input type="text" class="form-control" id="edit_inventory_num" name="inventory_num" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_print_model" class="form-label">Модель принтера</label>
+                            <select class="form-select" id="edit_print_model" name="print_model" required>
+                                <option value="">Не вибрано</option>
+                                {% for model in PrinterModel.query.all() %}
+                                    <option value="{{ model.id }}">{{ model.model_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_print_dept" class="form-label">Відділ</label>
+                            <select class="form-select" id="edit_print_dept" name="print_dept" required>
+                                <option value="">Не вибрано</option>
+                                {% for dept in RefillDept.query.all() %}
+                                    <option value="{{ dept.id }}">{{ dept.deptname }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Оновити</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <input type="text" id="search" class="form-control" placeholder="Пошук..." value="{{ search|escape }}" style="max-width: 400px;">
+            <button id="clear-search" class="btn btn-danger btn-sm ms-2" title="Очистити пошук">
+                <span>×</span>
+            </button>
+        </div>
+        <div>
+            <a href="{{ url_for('export_equipments_table') }}" class="btn btn-excel me-2">Звіт</a>
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addPrinterModal">Додати принтер</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+        </div>
+    </div>
+
+    <table class="table table-striped" id="printer-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Модель</th>
+                <th>Відділ</th>
+                <th>Серійний номер</th>
+                <th>Інвентарний номер</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody id="printer-table-body">
+            <!-- Дані завантажуються через JS -->
+        </tbody>
+    </table>
+
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center" id="pagination">
+            <!-- Пагінація оновлюється через JS -->
+        </ul>
+    </nav>
+
+    <style>
+        .actions-column {
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        #clear-search {
+            padding: 0.25rem 0.5rem;
+        }
+        .btn-excel {
+            background-color: #1D6F42;
+            color: white;
+            border: none;
+        }
+        .btn-excel:hover {
+            background-color: #155932;
+            color: white;
+        }
+    </style>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        let timeout;
+        const searchInput = document.getElementById('search');
+        const clearSearchBtn = document.getElementById('clear-search');
+        const addPrinterModal = new bootstrap.Modal(document.getElementById('addPrinterModal'));
+        const editPrinterModal = new bootstrap.Modal(document.getElementById('editPrinterModal'));
+
+        // Завантаження даних при ініціалізації
+        window.addEventListener('DOMContentLoaded', (event) => {
+            const initialSearch = searchInput.value.trim();
+            fetchPrinters(initialSearch, 1);
+        });
+
+        // Пошук із debounce
+        searchInput.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const searchValue = this.value.trim();
+            timeout = setTimeout(() => {
+                fetchPrinters(searchValue, 1);
+            }, 300);
+        });
+
+        // Очистка пошуку
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            fetchPrinters('', 1);
+        });
+
+        // Очистка за Esc
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' || event.keyCode === 27) {
+                searchInput.value = '';
+                fetchPrinters('', 1);
+            }
+        });
+
+        // Завантаження даних принтерів
+        function fetchPrinters(search, page) {
+            fetch(`/api/equipments?search=${encodeURIComponent(search)}&page=${page}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateTable(data.equipments);
+                updatePagination(data.pagination);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        // Оновлення таблиці
+        function updateTable(printers) {
+            const tbody = document.getElementById('printer-table-body');
+            tbody.innerHTML = '';
+            printers.forEach(printer => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${printer.id}</td>
+                    <td>${printer.model_name || 'Не вказано'}</td>
+                    <td>${printer.dept_name || 'Не вказано'}</td>
+                    <td>${printer.serial_num || 'N/A'}</td>
+                    <td>${printer.inventory_num || 'N/A'}</td>
+                    <td class="actions-column">
+                        <button class="btn btn-warning btn-sm edit-btn" data-inventory="${printer.inventory_num}" data-bs-toggle="modal" data-bs-target="#editPrinterModal">Редагувати</button>
+                        <button class="btn btn-danger btn-sm delete-btn" data-inventory="${printer.inventory_num}" onclick="deletePrinter('${printer.inventory_num}')">Видалити</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Обробники для редагування
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const inventoryNum = this.getAttribute('data-inventory');
+                    fetch(`/api/getPrinter?inventory_num=${encodeURIComponent(inventoryNum)}`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data) {
+                            document.getElementById('edit_printer_id').value = data.id;
+                            document.getElementById('edit_serial_num').value = data.serial_num || '';
+                            document.getElementById('edit_inventory_num').value = data.inventory_num || '';
+                            document.getElementById('edit_print_model').value = data.print_model || '';
+                            document.getElementById('edit_print_dept').value = data.print_dept || '';
+                        } else {
+                            alert('Принтер не знайдено');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Помилка:', error);
+                        alert('Помилка при отриманні даних принтера');
+                    });
+                });
+            });
+        }
+
+        // Оновлення пагінації
+        function updatePagination(pagination) {
+            const paginationUl = document.getElementById('pagination');
+            paginationUl.innerHTML = '';
+
+            if (pagination.has_prev) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchPrinters('${pagination.search}', ${pagination.prev_num}); return false;">Попередня</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Попередня</span></li>`;
+            }
+
+            pagination.pages.forEach(page => {
+                if (page === null) {
+                    paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                } else if (page === pagination.current_page) {
+                    paginationUl.innerHTML += `<li class="page-item active"><span class="page-link">${page}</span></li>`;
+                } else {
+                    paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchPrinters('${pagination.search}', ${page}); return false;">${page}</a></li>`;
+                }
+            });
+
+            if (pagination.has_next) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchPrinters('${pagination.search}', ${pagination.next_num}); return false;">Наступна</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Наступна</span></li>`;
+            }
+        }
+
+        // Додавання принтера
+        document.getElementById('addPrinterForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/createPrinter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addPrinterModal.hide();
+                    this.reset();
+                    fetchPrinters('', 1);
+                    alert('Принтер додано!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при додаванні принтера');
+            });
+        });
+
+        // Редагування принтера
+        document.getElementById('editPrinterForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/modifyPrinter', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    editPrinterModal.hide();
+                    fetchPrinters('', 1);
+                    alert('Принтер оновлено!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при редагуванні принтера');
+            });
+        });
+
+        // Видалення принтера
+        function deletePrinter(inventoryNum) {
+            if (confirm('Ви впевнені, що хочете видалити цей принтер?')) {
+                fetch('/api/removePrinter', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ inventory_num: inventoryNum })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        fetchPrinters('', 1);
+                        alert('Принтер видалено!');
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Помилка:', error);
+                    alert('Помилка при видаленні принтера');
+                });
+            }
+        }
+    </script>
+{% endblock %}

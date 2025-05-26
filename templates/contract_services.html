@@ -21,8 +21,8 @@
                 <th>Договір</th>
                 <th>Назва послуги</th>
                 <th>Тип послуги</th>
-                <th>Баланс</th>
-                <th>Дата оновлення</th>
+                <th>Поточний баланс</th>
+                <th>Початковий баланс</th>
                 <th>Дії</th>
             </tr>
         </thead>
@@ -205,20 +205,20 @@
             };
             services.forEach(service => {
                 const row = document.createElement('tr');
-                const formattedDate = service.time_updated
-                    ? new Intl.DateTimeFormat('uk-UA', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric'
-                      }).format(new Date(service.time_updated))
-                    : 'Не вказано';
+//                const formattedDate = service.time_updated
+//                    ? new Intl.DateTimeFormat('uk-UA', {
+//                          day: '2-digit',
+//                          month: '2-digit',
+//                          year: 'numeric'
+//                      }).format(new Date(service.time_updated))
+//                    : 'Не вказано';
                 row.innerHTML = `
                     <td>${service.id}</td>
                     <td>${service.contract_number} (${service.contractor_name})</td>
                     <td>${service.RefillServiceName}</td>
                     <td>${serviceTypeMap[service.service_type] || 'Невідомо'}</td>
                     <td>${service.balance}</td>
-                    <td>${formattedDate}</td>
+                    <td>${service.initial_balance}</td>
                     <td class="actions-column">
                         <button class="btn btn-warning btn-sm edit-btn" data-id="${service.id}" data-bs-toggle="modal" data-bs-target="#editServiceModal">Редагувати</button>
                         <button class="btn btn-danger btn-sm delete-btn" data-id="${service.id}">Видалити</button>

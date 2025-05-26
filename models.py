@@ -132,6 +132,7 @@ class ContractsServicesBalance(db.Model):
     contract_id: Mapped[int] = mapped_column(ForeignKey('contracts.id'), nullable=False)
     service_type: Mapped[int] = mapped_column(Integer, nullable=False)
     balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    initial_balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0) #26.05.25
     user_updated: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
     time_updated: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
     __table_args__ = (

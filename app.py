@@ -1,9 +1,8 @@
 import os, secrets
 from io import BytesIO
-from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, request, Response, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, Response, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-
-from sqlalchemy import func, and_, asc, desc, extract
+from sqlalchemy import func, and_, asc, desc, extract, or_
 
 from datetime import datetime
 import bcrypt
@@ -86,89 +85,6 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# CRUD для RefillDept
-@app.route('/refill_depts')
-@login_required
-def refill_depts():
-    search = request.args.get('search', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 10  # Кількість записів на сторінці
-    query = RefillDept.query.filter(RefillDept.deptname.ilike(f'%{search}%'))
-    pagination = query.paginate(page=page, per_page=per_page)
-    return render_template('refill_depts.html',
-                           depts=pagination.items,
-                           pagination=pagination,
-                           search=search)
-
-
-@app.route('/add_refill_dept', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def add_refill_dept():
-    if request.method == 'POST':
-        deptname = request.form['deptname']
-        if RefillDept.query.filter_by(deptname=deptname).first():
-            flash('Відділ із такою назвою вже існує!')
-            return render_template('add_refill_dept.html')
-        is_exec = int(request.form['is_exec'])
-        dept = RefillDept(
-            deptname=deptname,
-            addr1=request.form.get('addr1', ''),  # Отримуємо addr1, за замовчуванням ''
-            addr2=request.form.get('addr2', ''),  # Отримуємо addr2, за замовчуванням ''
-            addr3=request.form.get('addr3', ''),  # Отримуємо addr3, за замовчуванням ''
-            addr4=request.form.get('addr4', ''),  # Отримуємо addr4, за замовчуванням ''
-            addr5=request.form.get('addr5', ''),  # Отримуємо addr5, за замовчуванням ''
-            is_exec=is_exec,
-            user_updated=current_user.id,
-            time_updated=datetime.utcnow()  # Встановлюємо початковий час
-        )
-        db.session.add(dept)
-        db.session.commit()
-        flash('Відділ додано!')
-        return redirect(url_for('refill_depts'))
-    return render_template('add_refill_dept.html')
-
-
-@app.route('/edit_refill_dept/<int:dept_id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def edit_refill_dept(dept_id):
-    dept = RefillDept.query.get_or_404(dept_id)
-    if request.method == 'POST':
-        deptname = request.form['deptname']
-        if RefillDept.query.filter(RefillDept.deptname == deptname, RefillDept.id != dept_id).first():
-            flash('Відділ із такою назвою вже існує!')
-            return render_template('edit_refill_dept.html', dept=dept)
-        dept.deptname = deptname
-        dept.addr1 = request.form.get('addr1', '')  # Отримуємо addr1, за замовчуванням ''
-        dept.addr2 = request.form.get('addr2', '')  # Отримуємо addr2, за замовчуванням ''
-        dept.addr3 = request.form.get('addr3', '')  # Отримуємо addr3, за замовчуванням ''
-        dept.addr4 = request.form.get('addr4', '')  # Отримуємо addr4, за замовчуванням ''
-        dept.addr5 = request.form.get('addr5', '')  # Отримуємо addr5, за замовчуванням ''
-        dept.is_exec = int(request.form['is_exec'])
-        dept.user_updated = current_user.id
-        dept.time_updated = datetime.utcnow()  # Оновлюємо час зміни
-        db.session.commit()
-        flash('Відділ оновлено!')
-        return redirect(url_for('refill_depts'))
-    return render_template('edit_refill_dept.html', dept=dept)
-
-@app.route('/delete_refill_dept/<int:dept_id>', methods=['POST'])
-@login_required
-@admin_required
-def delete_refill_dept(dept_id):
-    dept = RefillDept.query.get_or_404(dept_id)
-    db.session.delete(dept)
-    event = EventLog(
-        table_name='refill_dept',
-        event_type=3,  # Видалення (новий тип події)
-        user_updated=current_user.id
-    )
-    db.session.add(event)
-    db.session.commit()
-    flash('Відділ видалено!')
-    return redirect(url_for('refill_depts'))
-
 # CRUD для PrinterModel
 @app.route('/printer_models')
 @login_required
@@ -233,98 +149,6 @@ def delete_printer_model(model_id):
     db.session.commit()
     flash('Модель видалено!')
     return redirect(url_for('printer_models'))
-
-# CRUD для CustomerEquipment
-# Основний маршрут для відображення обладнання
-@app.route('/equipments')
-@login_required
-def equipments():
-    search = request.args.get('search', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 20
-
-    query = db.session.query(CustomerEquipment, PrinterModel.model_name, RefillDept.deptname)\
-                      .outerjoin(PrinterModel, PrinterModel.id == CustomerEquipment.print_model)\
-                      .outerjoin(RefillDept, RefillDept.id == CustomerEquipment.print_dept)\
-                      .order_by(CustomerEquipment.id)
-
-    if search:
-        query = query.filter(CustomerEquipment.inventory_num.ilike(f'%{search}%'))
-
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    equipments = [(e[0], e[1], e[2]) for e in pagination.items]
-
-    return render_template('equipments.html',
-                           equipments=equipments,
-                           search=search,
-                           PrinterModel=PrinterModel,
-                           RefillDept=RefillDept,
-                           pagination=pagination)
-
-@app.route('/add_equipment', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def add_equipment():
-    if request.method == 'POST':
-        print_model = request.form['print_model']
-        print_dept = request.form['print_dept']
-        serial_num = request.form['serial_num']
-        inventory_num = request.form['inventory_num']
-        if CustomerEquipment.query.filter_by(inventory_num=inventory_num).first():
-            flash('Обладнання з таким інвентарним номером уже існує!')
-            return render_template('add_equipment.html', models=PrinterModel.query.all(), depts=RefillDept.query.all())
-        equip = CustomerEquipment(
-            print_model=print_model,
-            print_dept=print_dept,
-            serial_num=serial_num,
-            inventory_num=inventory_num,
-            user_updated=current_user.id
-        )
-        db.session.add(equip)
-        db.session.commit()
-        flash('Обладнання додано!')
-        return redirect(url_for('equipments'))
-    models = PrinterModel.query.all()
-    depts = RefillDept.query.all()
-    return render_template('add_equipment.html', models=models, depts=depts)
-
-@app.route('/edit_equipment/<int:equip_id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def edit_equipment(equip_id):
-    equip = CustomerEquipment.query.get_or_404(equip_id)
-    if request.method == 'POST':
-        print_model = request.form['print_model']
-        print_dept = request.form['print_dept']
-        serial_num = request.form['serial_num']
-        inventory_num = request.form['inventory_num']
-        if CustomerEquipment.query.filter(CustomerEquipment.inventory_num == inventory_num, CustomerEquipment.id != equip_id).first():
-            flash('Обладнання з таким інвентарним номером уже існує!')
-            return render_template('edit_equipment.html', equip=equip, models=PrinterModel.query.all(), depts=RefillDept.query.all())
-
-        equip.print_model = print_model
-        equip.print_dept = print_dept
-        equip.serial_num = serial_num
-        equip.inventory_num = inventory_num
-        equip.user_updated = current_user.id
-
-        db.session.commit()
-        flash('Обладнання оновлено!')
-        return redirect(url_for('equipments'))
-    models = PrinterModel.query.all()
-    depts = RefillDept.query.all()
-    return render_template('edit_equipment.html', equip=equip, models=models, depts=depts)
-
-@app.route('/delete_equipment/<int:equip_id>', methods=['POST'])
-@login_required
-@admin_required
-def delete_equipment(equip_id):
-    equip = CustomerEquipment.query.get_or_404(equip_id)
-    db.session.delete(equip)
-    db.session.commit()
-    flash('Обладнання видалено!')
-    return redirect(url_for('equipments'))
-
 
 # Відображення подій обробки картриджів та керування ними
 # Основний маршрут для відображення подій
@@ -403,74 +227,6 @@ def event_log():
         query = query.filter(EventLog.event_type == int(type_filter))
     logs = query.all()
     return render_template('event_log.html', User=User, logs=logs, table_filter=table_filter, type_filter=type_filter)
-
-# Додавання користувача
-@app.route('/users')
-@login_required
-@admin_required
-def users():
-    search = request.args.get('search', '')
-    users_list = User.query.filter(User.username.ilike(f'%{search}%')).all()
-    return render_template('users.html', users=users_list, search=search, RefillDept=RefillDept)
-
-
-@app.route('/add_user', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def add_user():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        humanname = request.form['humanname']
-        role = request.form['role']
-        dept_id = request.form['dept_id']  # Додаємо dept_id
-        if User.query.filter_by(username=username).first():
-            flash('Користувач із таким логіном уже існує!')
-            return render_template('add_user.html', depts=RefillDept.query.all())
-        hashed_password = hash_password(password)
-        new_user = User(username=username, password=hashed_password, humanname=humanname, role=role, dept_id=dept_id)
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Користувача додано!')
-        return redirect(url_for('users'))
-    return render_template('add_user.html', depts=RefillDept.query.all())  # Передаємо список відділів
-
-@app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def edit_user(user_id):
-    user = User.query.get_or_404(user_id)
-    if request.method == 'POST':
-        username = request.form['username']
-        if User.query.filter(User.username == username, User.id != user_id).first():
-            flash('Користувач із таким іменем уже існує!')
-            return render_template('edit_user.html', user=user, depts=RefillDept.query.all())
-        user.username = username
-        if request.form['password']:
-            user.password = bcrypt.hashpw(request.form['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        user.humanname = request.form['humanname']
-        user.role = request.form['role']
-        user.dept_id = request.form['dept_id']  # Додаємо dept_id
-        user.active = 'active' in request.form
-        user.time_updated = datetime.now()
-        db.session.commit()
-        flash('Користувача оновлено!')
-        return redirect(url_for('users'))
-    return render_template('edit_user.html', user=user, depts=RefillDept.query.all())  # Передаємо список відділів
-
-@app.route('/delete_user/<int:user_id>', methods=['POST'])
-@login_required
-@admin_required
-def delete_user(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.id == current_user.id:
-        flash('Ви не можете видалити себе!')
-        return redirect(url_for('users'))
-    db.session.delete(user)
-    db.session.commit()
-    flash('Користувача видалено!')
-    return redirect(url_for('users'))
-
 
 # CRUD для CartridgeModel
 @app.route('/cartridge_models')
@@ -649,33 +405,69 @@ def check_cartridge():
 @app.route('/api/cartridges', methods=['GET'])
 @login_required
 def api_cartridges():
-    search = request.args.get('search', '')
+    """
+    Повертає список картриджів із пагінацією та пошуком за всіма полями.
+
+    Args:
+        search (str): Пошуковий запит.
+        page (int): Номер сторінки.
+
+    Returns:
+        JSON: Список картриджів і пагінація.
+    """
+    search = request.args.get('search', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = 10
 
-    # Додаємо JOIN із CartridgeModel для отримання model_name
-    query = db.session.query(Cartridges, CartridgeModel.model_name)\
-                     .outerjoin(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)\
-                     .filter(Cartridges.serial_num.ilike(f'%{search}%'))\
-                     .order_by(CartridgeModel.model_name.asc())
+    # JOIN із CartridgeModel, CustomerEquipment, PrinterModel, RefillDept
+    query = db.session.query(
+        Cartridges,
+        CartridgeModel.model_name,
+        PrinterModel.model_name.label('printer_model_name'),
+        RefillDept.deptname
+    ).outerjoin(
+        CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id
+    ).outerjoin(
+        CustomerEquipment, Cartridges.in_printer == CustomerEquipment.id
+    ).outerjoin(
+        PrinterModel, CustomerEquipment.print_model == PrinterModel.id
+    ).outerjoin(
+        RefillDept, CustomerEquipment.print_dept == RefillDept.id
+    )
 
+    # Пошук за всіма полями
+    if search:
+        # Отримуємо список status_id, для яких status_name відповідає пошуковому запиту
+        matching_statuses = [
+            status_id for status_id, status_name in status_map.items()
+            if search.lower() in status_name.lower()
+        ]
+
+        query = query.filter(
+            or_(
+                Cartridges.serial_num.ilike(f'%{search}%'),
+                CartridgeModel.model_name.ilike(f'%{search}%'),
+                PrinterModel.model_name.ilike(f'%{search}%'),
+                RefillDept.deptname.ilike(f'%{search}%'),
+                Cartridges.curr_status.in_(matching_statuses)
+            )
+        )
+
+    # Сортування за model_name
+    query = query.order_by(CartridgeModel.model_name.asc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
     cartridges_data = []
-    for cartridge, model_name in pagination.items:
+    for cartridge, model_name, printer_model_name, deptname in pagination.items:
         in_printer_info = None
-        if cartridge.in_printer:
-            equipment = db.session.get(CustomerEquipment, cartridge.in_printer)
-            if equipment:
-                printer_model = db.session.get(PrinterModel, equipment.print_model)
-                dept = db.session.get(RefillDept, equipment.print_dept)
-                in_printer_info = f"{printer_model.model_name} ({dept.deptname})"
+        if cartridge.in_printer and printer_model_name and deptname:
+            in_printer_info = f"{printer_model_name} ({deptname})"
 
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
-            'cartridge_model': model_name or 'Не вказано',  # Зберігаємо назву поля, але використовуємо model_name
-            'in_printer_info': in_printer_info,
+            'cartrg_model_name': model_name or 'Не вказано',
+            'in_printer_info': in_printer_info or 'Немає',
             'curr_status': cartridge.curr_status
         })
 
@@ -685,7 +477,7 @@ def api_cartridges():
         'prev_num': pagination.prev_num,
         'next_num': pagination.next_num,
         'current_page': pagination.page,
-        'pages': list(pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1)),
+        'pages': [p if p else None for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1)],
         'search': search
     }
 
@@ -694,8 +486,8 @@ def api_cartridges():
         'pagination': pagination_data
     })
 
-#**************************робота з картриджами**************************
-
+#**************************end_робота з картриджами**************************
+"""
 # API для асинхронного пошуку по інвентарному номеру
 @app.route('/api/equipments', methods=['GET'])
 @login_required
@@ -732,6 +524,7 @@ def api_equipments():
     }
 
     return jsonify({'equipments': equipments, 'pagination': pagination_data})
+"""
 
 #Новий ендпоінт для принтерів
 @app.route('/api/printers_by_dept/<int:dept_id>', methods=['GET'])
@@ -2374,6 +2167,7 @@ def get_contract_services():
         'RefillServiceName': service.RefillServiceName,
         'service_type': service.service_type,
         'balance': service.balance,
+        'initial_balance': service.initial_balance,
         'time_updated': service.time_updated.isoformat() if service.time_updated else None
     } for service in pagination.items]
 
@@ -2680,6 +2474,8 @@ def get_statuses():
     return jsonify(statuses)
 
 #=======================================================================================================================
+# РОБОТА З КАРТРИДЖАМИ
+#=======================================================================================================================
 @app.route('/cartridges')
 @login_required
 @admin_required
@@ -2792,6 +2588,663 @@ def modify_cartridge():
         return jsonify({"success": True, "message": result["message"]}), 200
     return jsonify({"success": False, "message": result["message"]}), 400
 #=======================================================================================================================
+# РОБОТА З ПРИНТЕРАМИ
+#=======================================================================================================================
+@app.route('/printers')
+@login_required
+def printers():
+    """
+    Рендерить сторінку зі списком принтерів.
+    """
+    search = request.args.get('search', '')
+    return render_template('printers.html',
+                           search=search,
+                           RefillDept=RefillDept,
+                           PrinterModel=PrinterModel)
+
+"""
+    return render_template('cartridges.html',
+                           
+                           CustomerEquipment=CustomerEquipment,
+                           ,
+                           cartridges=cartridges,
+                           CartridgeModel=CartridgeModel,
+                           search=search,
+                           pagination=pagination)
+"""
+
+@app.route('/api/getPrinter', methods=['GET'])
+@login_required
+def get_printer():
+    """
+    Отримує дані принтера за інвентарним номером.
+
+    Args:
+        inventory_num (str): Інвентарний номер принтера.
+
+    Returns:
+        JSON: Дані принтера або помилка.
+    """
+    inventory_num = request.args.get('inventory_num')
+    if not inventory_num:
+        return jsonify({"success": False, "message": "Інвентарний номер не вказано"}), 400
+
+    result = getPrinterData(inventory_num)
+    if result["success"]:
+        return jsonify(result["data"]), 200
+    return jsonify({"success": False, "message": result["message"]}), 404
+
+@app.route('/api/createPrinter', methods=['POST'])
+@login_required
+@admin_required
+def create_printer():
+    """
+    Створює новий принтер.
+
+    Args:
+        JSON body: Словник із полями serial_num, inventory_num, print_model, print_dept.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = createPrinterData(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 201
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/removePrinter', methods=['DELETE'])
+@login_required
+@admin_required
+def remove_printer():
+    """
+    Видаляє принтер за інвентарним номером.
+
+    Args:
+        JSON body: Словник із полем inventory_num.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    inventory_num = data.get('inventory_num') if data else None
+    if not inventory_num:
+        return jsonify({"success": False, "message": "Інвентарний номер не вказано"}), 400
+
+    result = removePrinterData(inventory_num)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 404
+
+@app.route('/api/modifyPrinter', methods=['PATCH'])
+@login_required
+@admin_required
+def modify_printer():
+    """
+    Оновлює дані принтера.
+
+    Args:
+        JSON body: Словник із полями printer_id, serial_num, inventory_num, print_model, print_dept.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = modifyPrinterData(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/equipments', methods=['GET'])
+@login_required
+def get_equipments():
+    """
+    Повертає список принтерів із пагінацією та пошуком.
+
+    Args:
+        search (str): Пошуковий запит.
+        page (int): Номер сторінки.
+
+    Returns:
+        JSON: Список принтерів і пагінація.
+    """
+    search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    query = db.session.query(
+        CustomerEquipment,
+        PrinterModel.model_name,
+        RefillDept.deptname
+    ).outerjoin(
+        PrinterModel, PrinterModel.id == CustomerEquipment.print_model
+    ).outerjoin(
+        RefillDept, RefillDept.id == CustomerEquipment.print_dept
+    )
+
+    if search:
+        query = query.filter(
+            or_(
+                CustomerEquipment.inventory_num.ilike(f'%{search}%'),
+                CustomerEquipment.serial_num.ilike(f'%{search}%'),
+                PrinterModel.model_name.ilike(f'%{search}%'),
+                RefillDept.deptname.ilike(f'%{search}%')
+            )
+        )
+
+    query = query.order_by(CustomerEquipment.id)
+    paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    equipments = [{
+        'id': equip[0].id,
+        'model_name': equip[1] or 'Не вказано',
+        'dept_name': equip[2] or 'Не вказано',
+        'serial_num': equip[0].serial_num or 'N/A',
+        'inventory_num': equip[0].inventory_num or 'N/A'
+    } for equip in paginated.items]
+
+    pagination = {
+        'current_page': paginated.page,
+        'total_pages': paginated.pages,
+        'has_prev': paginated.has_prev,
+        'has_next': paginated.has_next,
+        'prev_num': paginated.prev_num,
+        'next_num': paginated.next_num,
+        'search': search,
+        'pages': [p if p else None for p in paginated.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2)]
+    }
+
+    return jsonify({'equipments': equipments, 'pagination': pagination})
+#=======================================================================================================================
+# РОБОТА З ВІДДІЛАМИ
+#=======================================================================================================================
+@app.route('/departments')
+@login_required
+def departments():
+    """
+    Рендерить сторінку зі списком відділів.
+    """
+    search = request.args.get('search', '')
+    return render_template('departments.html', search=search)
+
+@app.route('/api/getDept', methods=['GET'])
+@login_required
+def get_dept():
+    """
+    Отримує дані відділу за ID.
+
+    Args:
+        dept_id (int): ID відділу.
+
+    Returns:
+        JSON: Дані відділу або помилка.
+    """
+    dept_id = request.args.get('dept_id')
+    if not dept_id:
+        return jsonify({"success": False, "message": "ID відділу не вказано"}), 400
+
+    result = GetDeptData(dept_id)
+    if result["success"]:
+        return jsonify(result["data"]), 200
+    return jsonify({"success": False, "message": result["message"]}), 404
+
+@app.route('/api/createDept', methods=['POST'])
+@login_required
+@admin_required
+def create_dept():
+    """
+    Створює новий відділ.
+
+    Args:
+        JSON body: Словник із полями deptname, dept_description, addr1-addr5, is_exec.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = CreateDept(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 201
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/deleteDept', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_dept():
+    """
+    Видаляє відділ за ID.
+
+    Args:
+        JSON body: Словник із полем dept_id.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    dept_id = data.get('dept_id') if data else None
+    if not dept_id:
+        return jsonify({"success": False, "message": "ID відділу не вказано"}), 400
+
+    result = DeleteDept(dept_id, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/modifyDept', methods=['PATCH'])
+@login_required
+@admin_required
+def modify_dept():
+    """
+    Оновлює дані відділу.
+
+    Args:
+        JSON body: Словник із полями dept_id, deptname, dept_description, addr1-addr5, is_exec.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = ModifyDept(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/depts', methods=['GET'])
+@login_required
+def get_depts():
+    """
+    Повертає список відділів із пагінацією та пошуком.
+
+    Args:
+        search (str): Пошуковий запит (по deptname та is_exec).
+        page (int): Номер сторінки.
+
+    Returns:
+        JSON: Список відділів і пагінація.
+    """
+    search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    query = RefillDept.query
+
+    if search:
+        # Пошук за deptname та is_exec (текст)
+        is_exec_search = []
+        if 'клієнт' in search.lower():
+            is_exec_search.append(0)
+        if 'внутрішній виконавець' in search.lower():
+            is_exec_search.append(1)
+        if 'зовнішній виконавець' in search.lower():
+            is_exec_search.append(2)
+
+        query = query.filter(
+            or_(
+                RefillDept.deptname.ilike(f'%{search}%'),
+                RefillDept.is_exec.in_(is_exec_search) if is_exec_search else False
+            )
+        )
+
+    query = query.order_by(RefillDept.deptname.asc())
+    paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    depts = [{
+        'id': dept.id,
+        'deptname': dept.deptname,
+        'dept_description': dept.dept_description,
+        'addr1': dept.addr1,
+        'addr2': dept.addr2,
+        'addr3': dept.addr3,
+        'addr4': dept.addr4,
+        'addr5': dept.addr5,
+        'is_exec': dept.is_exec
+    } for dept in paginated.items]
+
+    pagination = {
+        'current_page': paginated.page,
+        'total_pages': paginated.pages,
+        'has_prev': paginated.has_prev,
+        'has_next': paginated.has_next,
+        'prev_num': paginated.prev_num,
+        'next_num': paginated.next_num,
+        'search': search,
+        'pages': [p if p else None for p in paginated.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2)]
+    }
+
+    return jsonify({'depts': depts, 'pagination': pagination})
+
+@app.route('/export/departments_table', methods=['GET'])
+@login_required
+def export_departments_table():
+    """
+    Експортує список відділів у Excel.
+
+    Args:
+        search (str): Пошуковий запит.
+
+    Returns:
+        File: Excel-файл із даними.
+    """
+    search = request.args.get('search', '')
+
+    query = RefillDept.query
+    if search:
+        is_exec_search = []
+        if 'клієнт' in search.lower():
+            is_exec_search.append(0)
+        if 'внутрішній виконавець' in search.lower():
+            is_exec_search.append(1)
+        if 'зовнішній виконавець' in search.lower():
+            is_exec_search.append(2)
+
+        query = query.filter(
+            or_(
+                RefillDept.deptname.ilike(f'%{search}%'),
+                RefillDept.dept_description.ilike(f'%{search}%'),
+                RefillDept.addr1.ilike(f'%{search}%'),
+                RefillDept.addr2.ilike(f'%{search}%'),
+                RefillDept.addr3.ilike(f'%{search}%'),
+                RefillDept.addr4.ilike(f'%{search}%'),
+                RefillDept.addr5.ilike(f'%{search}%'),
+                RefillDept.is_exec.in_(is_exec_search) if is_exec_search else False
+            )
+        )
+
+    query = query.order_by(RefillDept.deptname.asc())
+    depts = query.all()
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Список відділів"
+    headers = ["ID", "Назва", "Опис", "Адреса 1", "Адреса 2", "Адреса 3", "Адреса 4", "Адреса 5", "Тип"]
+    ws.append(headers)
+
+    for dept in depts:
+        type_label = 'Клієнт' if dept.is_exec == 0 else 'Внутрішній виконавець' if dept.is_exec == 1 else 'Зовнішній виконавець'
+        ws.append([
+            dept.id,
+            dept.deptname,
+            dept.dept_description or '',
+            dept.addr1 or '',
+            dept.addr2 or '',
+            dept.addr3 or '',
+            dept.addr4 or '',
+            dept.addr5 or '',
+            type_label
+        ])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Список_відділів_{timestamp}.xlsx"
+    return send_file(output, download_name=filename, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+#=======================================================================================================================
+# РОБОТА З КОРИСТУВАЧАМИ
+#=======================================================================================================================
+@app.route('/users')
+@login_required
+@admin_required
+def users():
+    """
+    Рендерить сторінку зі списком користувачів.
+    """
+    search = request.args.get('search', '')
+    return render_template('users.html',
+                           search=search,
+                           RefillDept=RefillDept)
+
+@app.route('/api/users', methods=['GET'])
+@login_required
+@admin_required
+def get_users():
+    """
+    Повертає список користувачів із пагінацією та пошуком.
+
+    Args:
+        search (str): Пошуковий запит (по username та id).
+        page (int): Номер сторінки.
+
+    Returns:
+        JSON: Список користувачів і пагінація.
+    """
+    search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    query = User.query
+
+    if search:
+        # Пошук за username та id
+        try:
+            user_id = int(search)
+            query = query.filter(
+                or_(
+                    User.username.ilike(f'%{search}%'),
+                    User.id == user_id
+                )
+            )
+        except ValueError:
+            query = query.filter(User.username.ilike(f'%{search}%'))
+
+    query = query.order_by(User.username.asc())
+    paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    users = [{
+        'id': user.id,
+        'username': user.username,
+        'humanname': user.humanname,
+        'dept_id': user.dept_id,
+        'dept_name': RefillDept.query.get(user.dept_id).deptname if RefillDept.query.get(user.dept_id) else 'Немає',
+        'role': user.role,
+        'active': user.active,
+        'lastlogin': user.lastlogin.isoformat() if user.lastlogin else None,
+        'time_updated': user.time_updated.isoformat() if user.time_updated else None
+    } for user in paginated.items]
+
+    pagination = {
+        'current_page': paginated.page,
+        'total_pages': paginated.pages,
+        'has_prev': paginated.has_prev,
+        'has_next': paginated.has_next,
+        'prev_num': paginated.prev_num,
+        'next_num': paginated.next_num,
+        'search': search,
+        'pages': [p if p else None for p in paginated.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2)]
+    }
+
+    return jsonify({'users': users, 'pagination': pagination})
+
+@app.route('/api/getUser', methods=['GET'])
+@login_required
+@admin_required
+def get_user():
+    """
+    Отримує дані користувача за ID.
+
+    Args:
+        user_id (int): ID користувача.
+
+    Returns:
+        JSON: Дані користувача або помилка.
+    """
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"success": False, "message": "ID користувача не вказано"}), 400
+
+    result = GetUserData(user_id)
+    if result["success"]:
+        return jsonify(result["data"]), 200
+    return jsonify({"success": False, "message": result["message"]}), 404
+
+@app.route('/api/createUser', methods=['POST'])
+@login_required
+@admin_required
+def create_user():
+    """
+    Створює нового користувача.
+
+    Args:
+        JSON body: Словник із полями username, password, humanname, dept_id, role, active.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = CreateUser(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 201
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/deleteUser', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_user_api():
+    """
+    Видаляє користувача за ID.
+
+    Args:
+        JSON body: Словник із полем user_id.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    user_id = data.get('user_id') if data else None
+    if not user_id:
+        return jsonify({"success": False, "message": "ID користувача не вказано"}), 400
+
+    result = DeleteUser(user_id, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/editUser', methods=['PATCH'])
+@login_required
+@admin_required
+def edit_user_api():
+    """
+    Оновлює дані користувача.
+
+    Args:
+        JSON body: Словник із полями user_id, username, password, humanname, dept_id, role, active.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = EditUser(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/export/users_table', methods=['GET'])
+@login_required
+@admin_required
+def export_users_table():
+    """
+    Експортує список користувачів у Excel.
+
+    Args:
+        search (str): Пошуковий запит.
+
+    Returns:
+        File: Excel-файл із даними.
+    """
+    search = request.args.get('search', '')
+
+    query = User.query
+    if search:
+        try:
+            user_id = int(search)
+            query = query.filter(
+                or_(
+                    User.username.ilike(f'%{search}%'),
+                    User.id == user_id
+                )
+            )
+        except ValueError:
+            query = query.filter(User.username.ilike(f'%{search}%'))
+
+    query = query.order_by(User.username.asc())
+    users = query.all()
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Список користувачів"
+    headers = ["ID", "Ім'я користувача", "Повне ім'я", "Відділ", "Роль", "Активний", "Останній вхід", "Оновлено"]
+    ws.append(headers)
+
+    for user in users:
+        dept = RefillDept.query.get(user.dept_id)
+        ws.append([
+            user.id,
+            user.username,
+            user.humanname,
+            dept.deptname if dept else 'Немає',
+            'Адмін' if user.role == 'admin' else 'Користувач',
+            'Так' if user.active else 'Ні',
+            user.lastlogin.strftime('%Y-%m-%d %H:%M') if user.lastlogin else 'Немає',
+            user.time_updated.strftime('%Y-%m-%d %H:%M') if user.time_updated else 'Немає'
+        ])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Список_користувачів_{timestamp}.xlsx"
+    return send_file(output, download_name=filename, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 
 
 if __name__ == '__main__':

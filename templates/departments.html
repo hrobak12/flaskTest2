@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+{% block title %}Відділи{% endblock %}
+{% block content %}
+    <h1>Список відділів</h1>
+
+    <!-- Модальне вікно для додавання -->
+    <div class="modal fade" id="addDeptModal" tabindex="-1" aria-labelledby="addDeptModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addDeptModalLabel">Додати відділ</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addDeptForm" method="post">
+                        <div class="mb-3">
+                            <label for="add_deptname" class="form-label">Назва відділу</label>
+                            <input type="text" class="form-control" id="add_deptname" name="deptname" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_dept_description" class="form-label">Опис</label>
+                            <textarea class="form-control" id="add_dept_description" name="dept_description"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_addr1" class="form-label">Адреса 1</label>
+                            <input type="text" class="form-control" id="add_addr1" name="addr1">
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_addr2" class="form-label">Адреса 2</label>
+                            <input type="text" class="form-control" id="add_addr2" name="addr2">
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_addr3" class="form-label">Адреса 3</label>
+                            <input type="text" class="form-control" id="add_addr3" name="addr3">
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_addr4" class="form-label">Адреса 4</label>
+                            <input type="text" class="form-control" id="add_addr4" name="addr4">
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_addr5" class="form-label">Адреса 5</label>
+                            <input type="text" class="form-control" id="add_addr5" name="addr5">
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_is_exec" class="form-label">Тип</label>
+                            <select class="form-select" id="add_is_exec" name="is_exec" required>
+                                <option value="0">Клієнт</option>
+                                <option value="1">Внутрішній виконавець</option>
+                                <option value="2">Зовнішній виконавець</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Додати</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальне вікно для редагування -->
+    <div class="modal fade" id="editDeptModal" tabindex="-1" aria-labelledby="editDeptModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editDeptModalLabel">Редагувати відділ</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editDeptForm" method="post">
+                        <input type="hidden" id="edit_dept_id" name="dept_id">
+                        <div class="mb-3">
+                            <label for="edit_deptname" class="form-label">Назва відділу</label>
+                            <input type="text" class="form-control" id="edit_deptname" name="deptname" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_dept_description" class="form-label">Опис</label>
+                            <textarea class="form-control" id="edit_dept_description" name="dept_description"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_addr1" class="form-label">Адреса 1</label>
+                            <input type="text" class="form-control" id="edit_addr1" name="addr1">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_addr2" class="form-label">Адреса 2</label>
+                            <input type="text" class="form-control" id="edit_addr2" name="addr2">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_addr3" class="form-label">Адреса 3</label>
+                            <input type="text" class="form-control" id="edit_addr3" name="addr3">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_addr4" class="form-label">Адреса 4</label>
+                            <input type="text" class="form-control" id="edit_addr4"></input>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_addr5" class="form-label">Адреса 5</label>
+                            <input type="text" class="form-control" id="edit_addr5" name="addr5">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_is_exec" class="form-label">Тип</label>
+                            <select class="form-select" id="edit_is_exec" name="is_exec" required>
+                                <option value="0">Клієнт</option>
+                                <option value="1">Внутрішній виконавець</option>
+                                <option value="2">Зовнішній виконавець</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Оновити</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <input type="text" id="search" class="form-control" placeholder="Пошук за назвою чи типом" value="{{ search|escape }}" style="max-width: 400px;">
+            <button id="clear-search" class="btn btn-danger btn-sm ms-2" title="Очистити пошук">
+                <span>×</span>
+            </button>
+        </div>
+        <div>
+            <a href="{{ url_for('export_departments_table') }}" class="btn btn-excel me-2">Звіт</a>
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addDeptModal">Додати відділ</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+        </div>
+    </div>
+
+    <table class="table table-striped" id="dept-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Назва</th>
+                <th>Тип</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody id="dept-table-body">
+            <!-- Дані завантажуються через JS -->
+        </tbody>
+    </table>
+
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center" id="pagination">
+            <!-- Пагінація оновлюється через JS -->
+        </ul>
+    </nav>
+
+    <style>
+        .actions-column {
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        #clear-search {
+            padding: 0.25rem 0.5rem;
+        }
+        .btn-excel {
+            background-color: #1D6F42;
+            color: white;
+            border: none;
+        }
+        .btn-excel:hover {
+            background-color: #155932;
+            color: white;
+        }
+    </style>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        let timeout;
+        const searchInput = document.getElementById('search');
+        const clearSearchBtn = document.getElementById('clear-search');
+        const addDeptModal = new bootstrap.Modal(document.getElementById('addDeptModal'));
+        const editDeptModal = new bootstrap.Modal(document.getElementById('editDeptModal'));
+
+        // Завантаження даних при ініціалізації
+        window.addEventListener('DOMContentLoaded', (event) => {
+            const initialSearch = searchInput.value.trim();
+            fetchDepts(initialSearch, 1);
+        });
+
+        // Пошук із debounce
+        searchInput.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const searchValue = this.value.trim();
+            timeout = setTimeout(() => {
+                fetchDepts(searchValue, 1);
+            }, 300);
+        });
+
+        // Очистка пошуку
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            fetchDepts('', 1);
+        });
+
+        // Очистка за Esc
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' || event.keyCode === 27) {
+                searchInput.value = '';
+                fetchDepts('', 1);
+            }
+        });
+
+        // Завантаження відділів
+        function fetchDepts(search, page) {
+            fetch(`/api/depts?search=${encodeURIComponent(search)}&page=${page}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateTable(data.depts);
+                updatePagination(data.pagination);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        // Оновлення таблиці
+        function updateTable(depts) {
+            const tbody = document.getElementById('dept-table-body');
+            tbody.innerHTML = '';
+            depts.forEach(dept => {
+                const row = document.createElement('tr');
+                const typeLabel = dept.is_exec == 0 ? 'Клієнт' : dept.is_exec == 1 ? 'Внутрішній виконавець' : 'Зовнішній виконавець';
+                const typeClass = dept.is_exec == 0 ? 'bg-primary' : 'bg-success';
+                row.innerHTML = `
+                    <td>${dept.id}</td>
+                    <td>${dept.deptname}</td>
+                    <td><span class="badge ${typeClass}">${typeLabel}</span></td>
+                    <td class="actions-column">
+                        <button class="btn btn-warning btn-sm edit-btn" data-dept-id="${dept.id}" data-bs-toggle="modal" data-bs-target="#editDeptModal">Редагувати</button>
+                        <button class="btn btn-danger btn-sm delete-btn" onclick="deleteDept(${dept.id})">Видалити</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Обробники для редагування
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const deptId = this.getAttribute('data-dept-id');
+                    fetch(`/api/getDept?dept_id=${deptId}`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data) {
+                            document.getElementById('edit_dept_id').value = data.id;
+                            document.getElementById('edit_deptname').value = data.deptname;
+                            document.getElementById('edit_dept_description').value = data.dept_description || '';
+                            document.getElementById('edit_addr1').value = data.addr1 || '';
+                            document.getElementById('edit_addr2').value = data.addr2 || '';
+                            document.getElementById('edit_addr3').value = data.addr3 || '';
+                            document.getElementById('edit_addr4').value = data.addr4 || '';
+                            document.getElementById('edit_addr5').value = data.addr5 || '';
+                            document.getElementById('edit_is_exec').value = data.is_exec;
+                        } else {
+                            alert('Відділ не знайдено');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Помилка:', error);
+                        alert('Помилка при отриманні даних відділу');
+                    });
+                });
+            });
+        }
+
+        // Оновлення пагінації
+        function updatePagination(pagination) {
+            const paginationUl = document.getElementById('pagination');
+            paginationUl.innerHTML = '';
+
+            if (pagination.has_prev) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchDepts('${pagination.search}', ${pagination.prev_num}); return false;">Попередня</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Попередня</span></li>`;
+            }
+
+            pagination.pages.forEach(page => {
+                if (page === null) {
+                    paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                } else if (page === pagination.current_page) {
+                    paginationUl.innerHTML += `<li class="page-item active"><span class="page-link">${page}</span></li>`;
+                } else {
+                    paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchDepts('${pagination.search}', ${page}); return false;">${page}</a></li>`;
+                }
+            });
+
+            if (pagination.has_next) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchDepts('${pagination.search}', ${pagination.next_num}); return false;">Наступна</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Наступна</span></li>`;
+            }
+        }
+
+        // Додавання відділу
+        document.getElementById('addDeptForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/createDept', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addDeptModal.hide();
+                    this.reset();
+                    fetchDepts('', 1);
+                    alert('Відділ додано!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при додаванні відділу');
+            });
+        });
+
+        // Редагування відділу
+        document.getElementById('editDeptForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/modifyDept', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    editDeptModal.hide();
+                    fetchDepts('', 1);
+                    alert('Відділ оновлено!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при редагуванні відділу');
+            });
+        });
+
+        // Видалення відділу
+        function deleteDept(deptId) {
+            if (confirm('Ви впевнені, що хочете видалити цей відділ?')) {
+                fetch('/api/deleteDept', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dept_id: deptId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        fetchDepts('', 1);
+                        alert('Відділ видалено!');
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Помилка:', error);
+                    alert('Помилка при видаленні відділу');
+                });
+            }
+        }
+    </script>
+{% endblock %}
