@@ -163,86 +163,6 @@ def event_log():
     logs = query.all()
     return render_template('event_log.html', User=User, logs=logs, table_filter=table_filter, type_filter=type_filter)
 
-# CRUD для CartridgeModel
-@app.route('/cartridge_models')
-@login_required
-def cartridge_models():
-    search = request.args.get('search', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 10  # Кількість записів на сторінці
-    query = CartridgeModel.query.filter(CartridgeModel.model_name.ilike(f'%{search}%'))
-    pagination = query.paginate(page=page, per_page=per_page)
-    return render_template('cartridge_models.html',
-                           models=pagination.items,
-                           pagination=pagination,
-                           search=search,
-                           PrinterModel=PrinterModel,
-                           Contracts = Contracts,
-                           RefillDept = RefillDept,
-                           CompatibleServices = CompatibleServices,
-                           ContractsServicesBalance = ContractsServicesBalance)  # Додаємо PrinterModel для відображення назви принтера
-
-@app.route('/add_cartridge_model', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def add_cartridge_model():
-    if request.method == 'POST':
-        model_name = request.form['model_name']
-        if CartridgeModel.query.filter_by(model_name=model_name).first():
-            flash('Модель із такою назвою вже існує!')
-            return render_template('add_cartridge_model.html', printer_models=PrinterModel.query.all())
-        model_type = int(request.form['model_type'])
-        printer_model_id = request.form['printer_model_id'] or None  # Додаємо вибір моделі принтера
-        model = CartridgeModel(
-            model_name=model_name,
-            model_type=model_type,
-            printer_model_id=printer_model_id,  # Прив’язка до моделі принтера
-            user_updated=current_user.id,
-            time_updated=datetime.utcnow()
-        )
-        db.session.add(model)
-        db.session.commit()
-        flash('Модель картриджа додано!')
-        return redirect(url_for('cartridge_models'))
-    return render_template('add_cartridge_model.html', printer_models=PrinterModel.query.all())  # Передаємо список моделей принтерів
-
-@app.route('/edit_cartridge_model/<int:model_id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def edit_cartridge_model(model_id):
-    model = CartridgeModel.query.get_or_404(model_id)
-    if request.method == 'POST':
-        model_name = request.form['model_name']
-        if CartridgeModel.query.filter(CartridgeModel.model_name == model_name, CartridgeModel.id != model_id).first():
-            flash('Модель із такою назвою вже існує!')
-            return render_template('edit_cartridge_model.html', model=model, printer_models=PrinterModel.query.all())
-        model.model_name = model_name
-        model.model_type = int(request.form['model_type'])
-        model.printer_model_id = request.form['printer_model_id'] or None  # Оновлюємо прив’язку до принтера
-        model.user_updated = current_user.id
-        model.time_updated = datetime.utcnow()
-        db.session.commit()
-        flash('Модель оновлено!')
-        return redirect(url_for('cartridge_models'))
-    return render_template('edit_cartridge_model.html', model=model, printer_models=PrinterModel.query.all())  # Передаємо список моделей принтерів
-
-@app.route('/delete_cartridge_model/<int:model_id>', methods=['POST'])
-@login_required
-@admin_required
-def delete_cartridge_model(model_id):
-    model = CartridgeModel.query.get_or_404(model_id)
-    db.session.delete(model)
-    event = EventLog(
-        table_name='cartrg_model',
-        event_type=3,  # Видалення
-        user_updated=current_user.id
-    )
-    db.session.add(event)
-    db.session.commit()
-    flash('Модель видалено!')
-    return redirect(url_for('cartridge_models'))
-
-
 #**************************робота з картриджами**************************
 @app.route('/add_cartridge_event', methods=['POST'])
 @login_required
@@ -422,45 +342,6 @@ def api_cartridges():
     })
 
 #**************************end_робота з картриджами**************************
-"""
-# API для асинхронного пошуку по інвентарному номеру
-@app.route('/api/equipments', methods=['GET'])
-@login_required
-def api_equipments():
-    search = request.args.get('search', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 20
-
-    query = db.session.query(CustomerEquipment, PrinterModel.model_name, RefillDept.deptname)\
-                      .outerjoin(PrinterModel, PrinterModel.id == CustomerEquipment.print_model)\
-                      .outerjoin(RefillDept, RefillDept.id == CustomerEquipment.print_dept)\
-                      .order_by(CustomerEquipment.id)
-
-    if search:
-        query = query.filter(CustomerEquipment.inventory_num.ilike(f'%{search}%'))
-
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    equipments = [{
-        'id': e[0].id,
-        'model_name': e[1] or 'Не вказано',
-        'dept_name': e[2] or 'Не вказано',
-        'serial_num': e[0].serial_num,
-        'inventory_num': e[0].inventory_num
-    } for e in pagination.items]
-
-    pagination_data = {
-        'has_prev': pagination.has_prev,
-        'prev_num': pagination.prev_num,
-        'has_next': pagination.has_next,
-        'next_num': pagination.next_num,
-        'current_page': pagination.page,
-        'pages': list(pagination.iter_pages()),
-        'search': search
-    }
-
-    return jsonify({'equipments': equipments, 'pagination': pagination_data})
-"""
-
 #Новий ендпоінт для принтерів
 @app.route('/api/printers_by_dept/<int:dept_id>', methods=['GET'])
 @login_required
@@ -3399,7 +3280,238 @@ def export_printermodels_table():
     filename = f"Список_моделей_принтерів_{timestamp}.xlsx"
     return send_file(output, download_name=filename, as_attachment=True,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+#=======================================================================================================================
+# РОБОТА З МОДЕЛЯМИ КАРТРИДЖІВ
+#=======================================================================================================================
+@app.route('/cartridge_models')
+@login_required
+def cartridge_models():
+    """
+    Рендерить сторінку зі списком моделей картриджів.
+    """
+    search = request.args.get('search', '')
+    return render_template('cartridgemodels.html',
+                           search=search,
+                           PrinterModel=PrinterModel,
+                           Contracts=Contracts,
+                           RefillDept=RefillDept)
 
+@app.route('/api/cartridgemodels', methods=['GET'])
+@login_required
+def get_cartridgemodels():
+    """
+    Повертає список моделей картриджів із пагінацією та пошуком.
+
+    Args:
+        search (str): Пошуковий запит (по model_name та id).
+        page (int): Номер сторінки.
+
+    Returns:
+        JSON: Список моделей і пагінація.
+    """
+    search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    query = CartridgeModel.query
+
+    if search:
+        # Пошук за model_name та id
+        try:
+            model_id = int(search)
+            query = query.filter(
+                or_(
+                    CartridgeModel.model_name.ilike(f'%{search}%'),
+                    CartridgeModel.id == model_id
+                )
+            )
+        except ValueError:
+            query = query.filter(CartridgeModel.model_name.ilike(f'%{search}%'))
+
+    query = query.order_by(CartridgeModel.model_name.asc())
+    paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    models = []
+    for model in paginated.items:
+        has_service = CompatibleServices.query.filter_by(cartridge_model_id=model.id).first() is not None
+        printer = PrinterModel.query.get(model.printer_model_id) if model.printer_model_id else None
+        models.append({
+            'id': model.id,
+            'model_name': model.model_name,
+            'model_type': model.model_type,
+            'printer_model_id': model.printer_model_id,
+            'printer_model_name': printer.model_name if printer else None,
+            'has_service': has_service
+        })
+
+    pagination = {
+        'current_page': paginated.page,
+        'total_pages': paginated.pages,
+        'has_prev': paginated.has_prev,
+        'has_next': paginated.has_next,
+        'prev_num': paginated.prev_num,
+        'next_num': paginated.next_num,
+        'search': search,
+        'pages': [p if p else None for p in paginated.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2)]
+    }
+
+    return jsonify({'models': models, 'pagination': pagination})
+
+@app.route('/api/getCartridgeModel', methods=['GET'])
+@login_required
+def get_cartridge_model():
+    """
+    Отримує дані моделі картриджа за ID.
+
+    Args:
+        model_id (int): ID моделі.
+
+    Returns:
+        JSON: Дані моделі або помилка.
+    """
+    model_id = request.args.get('model_id')
+    if not model_id:
+        return jsonify({"success": False, "message": "ID моделі не вказано"}), 400
+
+    result = GetCartridgeModelData(model_id)
+    if result["success"]:
+        return jsonify(result["data"]), 200
+    return jsonify({"success": False, "message": result["message"]}), 404
+
+@app.route('/api/createCartridgeModel', methods=['POST'])
+@login_required
+@admin_required
+def create_cartridge_model():
+    """
+    Створює нову модель картриджа.
+
+    Args:
+        JSON body: Словник із полями model_name, model_type, printer_model_id (опціонально).
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = CreateCartridgeModel(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 201
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/deleteCartridgeModel', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_cartridge_model_api():
+    """
+    Видаляє модель за ID із логуванням.
+
+    Args:
+        JSON body: Словник із полем model_id.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    model_id = data.get('model_id') if data else None
+    if not model_id:
+        return jsonify({"success": False, "message": "ID моделі не вказано"}), 400
+
+    result = DeleteCartridgeModel(model_id, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/editCartridgeModel', methods=['PATCH'])
+@login_required
+@admin_required
+def edit_cartridge_model_api():
+    """
+    Оновлює дані моделі.
+
+    Args:
+        JSON body: Словник із полями model_id, model_name, model_type, printer_model_id (опціонально).
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = EditCartridgeModel(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/export/cartridgemodels_table', methods=['GET'])
+@login_required
+def export_cartridgemodels_table():
+    """
+    Експортує список моделей картриджів у Excel.
+
+    Args:
+        search (str): Пошуковий запит.
+
+    Returns:
+        File: Excel-файл із даними.
+    """
+    search = request.args.get('search', '')
+
+    query = CartridgeModel.query
+    if search:
+        try:
+            model_id = int(search)
+            query = query.filter(
+                or_(
+                    CartridgeModel.model_name.ilike(f'%{search}%'),
+                    CartridgeModel.id == model_id
+                )
+            )
+        except ValueError:
+            query = query.filter(CartridgeModel.model_name.ilike(f'%{search}%'))
+
+    query = query.order_by(CartridgeModel.model_name.asc())
+    models = query.all()
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Список моделей картриджів"
+    headers = ["ID", "Назва моделі", "Тип", "Модель принтера"]
+    ws.append(headers)
+
+    for model in models:
+        model_type = {0: 'Тонер + барабан', 1: 'Тільки тонер', 2: 'Тільки барабан', 3: 'Стрічка', 4: 'Чорнила'}.get(model.model_type, 'Невідомо')
+        printer = PrinterModel.query.get(model.printer_model_id) if model.printer_model_id else None
+        ws.append([
+            model.id,
+            model.model_name,
+            model_type,
+            printer.model_name if printer else 'Не вказано'
+        ])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Список_моделей_картриджів_{timestamp}.xlsx"
+    return send_file(output, download_name=filename, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 

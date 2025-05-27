@@ -896,3 +896,164 @@ def EditPrinterModel(data: dict, current_user_id: int) -> dict:
         db.session.rollback()
         return {"success": False, "message": f"Помилка: {str(e)}"}
 # -----------------------------------------------------------------------------------------------------------------------
+def GetCartridgeModelData(model_id: int) -> dict:
+    """
+    Отримує дані моделі картриджа за ID.
+
+    Args:
+        model_id (int): ID моделі.
+
+    Returns:
+        dict: Дані моделі або помилка {"success": bool, "message": str, "data": dict}.
+    """
+    try:
+        model = CartridgeModel.query.get(model_id)
+        if not model:
+            return {"success": False, "message": "Модель не знайдено", "data": {}}
+
+        return {
+            "success": True,
+            "message": "Дані отримано",
+            "data": {
+                "id": model.id,
+                "model_name": model.model_name,
+                "model_type": model.model_type,
+                "printer_model_id": model.printer_model_id
+            }
+        }
+    except Exception as e:
+        return {"success": False, "message": f"Помилка: {str(e)}", "data": {}}
+# -----------------------------------------------------------------------------------------------------------------------
+def CreateCartridgeModel(data: dict, current_user_id: int) -> dict:
+    """
+    Створює нову модель картриджа у базі даних.
+
+    Args:
+        data (dict): Словник із полями model_name, model_type, printer_model_id (опціонально).
+        current_user_id (int): ID поточного користувача.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        model_name = data.get("model_name")
+        model_type = data.get("model_type")
+        printer_model_id = data.get("printer_model_id")
+
+        if not model_name or model_type is None:
+            return {"success": False, "message": "Усі обов’язкові поля необхідно заповнити"}
+
+        if CartridgeModel.query.filter_by(model_name=model_name).first():
+            return {"success": False, "message": "Модель із такою назвою уже існує"}
+
+        model_type = int(model_type)
+        if model_type not in [0, 1, 2, 3, 4]:
+            return {"success": False, "message": "Недопустимий тип картриджа"}
+
+        if printer_model_id:
+            printer_model_id = int(printer_model_id)
+            if not PrinterModel.query.get(printer_model_id):
+                return {"success": False, "message": "Модель принтера не знайдено"}
+        else:
+            printer_model_id = None
+
+        new_model = CartridgeModel(
+            model_name=model_name,
+            model_type=model_type,
+            printer_model_id=printer_model_id,
+            user_updated=current_user_id,
+            time_updated=datetime.utcnow()
+        )
+
+        db.session.add(new_model)
+        db.session.commit()
+        return {"success": True, "message": "Модель додано успішно"}
+    except IntegrityError:
+        db.session.rollback()
+        return {"success": False, "message": "Помилка: порушення даних"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+# -----------------------------------------------------------------------------------------------------------------------
+def DeleteCartridgeModel(model_id: int, current_user_id: int) -> dict:
+    """
+    Видаляє модель картриджа за ID із логуванням.
+
+    Args:
+        model_id (int): ID моделі.
+        current_user_id (int): ID поточного користувача.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        model = CartridgeModel.query.get(model_id)
+        if not model:
+            return {"success": False, "message": "Модель не знайдено"}
+
+        db.session.delete(model)
+        event = EventLog(
+            table_name='cartrg_model',
+            event_type=3,
+            user_updated=current_user_id
+        )
+        db.session.add(event)
+        db.session.commit()
+        return {"success": True, "message": "Модель видалено успішно"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+
+def EditCartridgeModel(data: dict, current_user_id: int) -> dict:
+    """
+    Оновлює дані моделі картриджа у базі даних.
+
+    Args:
+        data (dict): Словник із полями model_id, model_name, model_type, printer_model_id (опціонально).
+        current_user_id (int): ID поточного користувача.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        model_id = data.get("model_id")
+        model_name = data.get("model_name")
+        model_type = data.get("model_type")
+        printer_model_id = data.get("printer_model_id")
+
+        if not model_id or not model_name or model_type is None:
+            return {"success": False, "message": "Усі обов’язкові поля необхідно заповнити"}
+
+        model = CartridgeModel.query.get(model_id)
+        if not model:
+            return {"success": False, "message": "Модель не знайдено"}
+
+        if CartridgeModel.query.filter(CartridgeModel.model_name == model_name, CartridgeModel.id != model_id).first():
+            return {"success": False, "message": "Модель із такою назвою уже існує"}
+
+        model_type = int(model_type)
+        if model_type not in [0, 1, 2, 3, 4]:
+            return {"success": False, "message": "Недопустимий тип картриджа"}
+
+        if printer_model_id:
+            printer_model_id = int(printer_model_id)
+            if not PrinterModel.query.get(printer_model_id):
+                return {"success": False, "message": "Модель принтера не знайдено"}
+        else:
+            printer_model_id = None
+
+        model.model_name = model_name
+        model.model_type = model_type
+        model.printer_model_id = printer_model_id
+        model.user_updated = current_user_id
+        model.time_updated = datetime.utcnow()
+
+        db.session.commit()
+        return {"success": True, "message": "Модель оновлено успішно"}
+    except IntegrityError:
+        db.session.rollback()
+        return {"success": False, "message": "Помилка: порушення даних"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+# -----------------------------------------------------------------------------------------------------------------------
