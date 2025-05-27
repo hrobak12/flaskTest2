@@ -756,3 +756,143 @@ def EditUser(data: dict, current_user_id: int) -> dict:
         db.session.rollback()
         return {"success": False, "message": f"Помилка: {str(e)}"}
 # -----------------------------------------------------------------------------------------------------------------------
+def GetPrinterModelData(model_id: int) -> dict:
+    """
+    Отримує дані моделі принтера за ID.
+
+    Args:
+        model_id (int): ID моделі.
+
+    Returns:
+        dict: Дані моделі або помилка {"success": bool, "message": str, "data": dict}.
+    """
+    try:
+        model = PrinterModel.query.get(model_id)
+        if not model:
+            return {"success": False, "message": "Модель не знайдено", "data": {}}
+
+        return {
+            "success": True,
+            "message": "Дані отримано",
+            "data": {
+                "id": model.id,
+                "model_name": model.model_name,
+                "ink_type": model.ink_type
+            }
+        }
+    except Exception as e:
+        return {"success": False, "message": f"Помилка: {str(e)}", "data": {}}
+# -----------------------------------------------------------------------------------------------------------------------
+def CreatePrinterModel(data: dict, current_user_id: int) -> dict:
+    """
+    Створює нову модель принтера у базі даних.
+
+    Args:
+        data (dict): Словник із полями model_name, ink_type.
+        current_user_id (int): ID поточного користувача.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        model_name = data.get("model_name")
+        ink_type = data.get("ink_type")
+
+        if not model_name or ink_type is None:
+            return {"success": False, "message": "Усі поля обов’язкові"}
+
+        if PrinterModel.query.filter_by(model_name=model_name).first():
+            return {"success": False, "message": "Модель із такою назвою уже існує"}
+
+        ink_type = int(ink_type)
+        if ink_type not in [0, 1, 2]:
+            return {"success": False, "message": "Недопустимий тип чорнил"}
+
+        new_model = PrinterModel(
+            model_name=model_name,
+            ink_type=ink_type,
+            user_updated=current_user_id
+        )
+
+        db.session.add(new_model)
+        db.session.commit()
+        return {"success": True, "message": "Модель додано успішно"}
+    except IntegrityError:
+        db.session.rollback()
+        return {"success": False, "message": "Помилка: порушення даних"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+# -----------------------------------------------------------------------------------------------------------------------
+def DeletePrinterModel(model_id: int, current_user_id: int) -> dict:
+    """
+    Видаляє модель принтера за ID із логуванням.
+
+    Args:
+        model_id (int): ID моделі.
+        current_user_id (int): ID поточного користувача.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        model = PrinterModel.query.get(model_id)
+        if not model:
+            return {"success": False, "message": "Модель не знайдено"}
+
+        db.session.delete(model)
+        event = EventLog(
+            table_name='model_print',
+            event_type=3,
+            user_updated=current_user_id
+        )
+        db.session.add(event)
+        db.session.commit()
+        return {"success": True, "message": "Модель видалено успішно"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+# -----------------------------------------------------------------------------------------------------------------------
+def EditPrinterModel(data: dict, current_user_id: int) -> dict:
+    """
+    Оновлює дані моделі принтера у базі даних.
+
+    Args:
+        data (dict): Словник із полями model_id, model_name, ink_type.
+        current_user_id (int): ID поточного користувача.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str}.
+    """
+    try:
+        model_id = data.get("model_id")
+        model_name = data.get("model_name")
+        ink_type = data.get("ink_type")
+
+        if not model_id or not model_name or ink_type is None:
+            return {"success": False, "message": "Усі поля необхідні"}
+
+        model = PrinterModel.query.get(model_id)
+        if not model:
+            return {"success": False, "message": "Модель не знайдено"}
+
+        if PrinterModel.query.filter(PrinterModel.model_name == model_name, PrinterModel.id != model_id).first():
+            return {"success": False, "message": "Модель із такою назвою уже існує"}
+
+        ink_type = int(ink_type)
+        if ink_type not in [0, 1, 2]:
+            return {"success": False, "message": "Недопустимий тип чорнил"}
+
+        model.model_name = model_name
+        model.ink_type = ink_type
+        model.user_updated = current_user_id
+
+        db.session.commit()
+        return {"success": True, "message": "Модель оновлено успішно"}
+    except IntegrityError:
+        db.session.rollback()
+        return {"success": False, "message": "Помилка: порушення даних"}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": f"Помилка: {str(e)}"}
+# -----------------------------------------------------------------------------------------------------------------------

@@ -85,71 +85,6 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# CRUD для PrinterModel
-@app.route('/printer_models')
-@login_required
-def printer_models():
-    search = request.args.get('search', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 10  # Кількість записів на сторінці
-    query = PrinterModel.query.filter(PrinterModel.model_name.ilike(f'%{search}%'))
-    pagination = query.paginate(page=page, per_page=per_page)
-    return render_template('printer_models.html',
-                           models=pagination.items,
-                           pagination=pagination,
-                           search=search)
-
-@app.route('/add_printer_model', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def add_printer_model():
-    if request.method == 'POST':
-        model_name = request.form['model_name']
-        if PrinterModel.query.filter_by(model_name=model_name).first():
-            flash('Модель із такою назвою вже існує!')
-            return render_template('add_printer_model.html')
-        ink_type = int(request.form['ink_type'])
-        model = PrinterModel(model_name=model_name, ink_type=ink_type, user_updated=current_user.id)
-        db.session.add(model)
-        db.session.commit()
-        flash('Модель принтера додано!')
-        return redirect(url_for('printer_models'))
-    return render_template('add_printer_model.html')
-
-@app.route('/edit_printer_model/<int:model_id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def edit_printer_model(model_id):
-    model = PrinterModel.query.get_or_404(model_id)
-    if request.method == 'POST':
-        model_name = request.form['model_name']
-        if PrinterModel.query.filter(PrinterModel.model_name == model_name, PrinterModel.id != model_id).first():
-            flash('Модель із такою назвою вже існує!')
-            return render_template('edit_printer_model.html', model=model)
-        model.model_name = model_name
-        model.ink_type = int(request.form['ink_type'])
-        model.user_updated = current_user.id
-        db.session.commit()
-        flash('Модель оновлено!')
-        return redirect(url_for('printer_models'))
-    return render_template('edit_printer_model.html', model=model)
-
-@app.route('/delete_printer_model/<int:model_id>', methods=['POST'])
-@login_required
-@admin_required
-def delete_printer_model(model_id):
-    model = PrinterModel.query.get_or_404(model_id)
-    db.session.delete(model)
-    event = EventLog(
-        table_name='model_print',
-        event_type=3,  # Видалення (новий тип події)
-        user_updated=current_user.id
-    )
-    db.session.add(event)
-    db.session.commit()
-    flash('Модель видалено!')
-    return redirect(url_for('printer_models'))
-
 # Відображення подій обробки картриджів та керування ними
 # Основний маршрут для відображення подій
 @app.route('/cartridge_status')
@@ -466,7 +401,7 @@ def api_cartridges():
         cartridges_data.append({
             'id': cartridge.id,
             'serial_num': cartridge.serial_num,
-            'cartrg_model_name': model_name or 'Не вказано',
+            'cartridge_model': model_name or 'Не вказано',
             'in_printer_info': in_printer_info or 'Немає',
             'curr_status': cartridge.curr_status
         })
@@ -3244,6 +3179,229 @@ def export_users_table():
     filename = f"Список_користувачів_{timestamp}.xlsx"
     return send_file(output, download_name=filename, as_attachment=True,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+#=======================================================================================================================
+# РОБОТА З МОДЕЛЯМИ ПРИНТЕРІВ
+#=======================================================================================================================
+@app.route('/printer_models')
+@login_required
+def printer_models():
+    """
+    Рендерить сторінку зі списком моделей принтерів.
+    """
+    search = request.args.get('search', '')
+    return render_template('printer_models.html', search=search)
+
+@app.route('/api/printermodels', methods=['GET'])
+@login_required
+def get_printermodels():
+    """
+    Повертає список моделей принтерів із пагінацією та пошуком.
+
+    Args:
+    search (str): Пошуковий запит (по model_name та id).
+    page (int): Номер сторінки.
+
+    Returns:
+    JSON: Список моделей і пагінація.
+    """
+    search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    printers = PrinterModel.query
+
+    if search:
+        # Пошук за model_name та id
+        try:
+            model_id = int(search)
+            printers = printers.filter(
+                or_(
+                    PrinterModel.model_name.ilike(f'%{search}%'),
+                    PrinterModel.id == model_id
+                )
+            )
+        except ValueError:
+            printers = printers.filter(PrinterModel.model_name.ilike(f'%{search}%'))
+
+    printers = printers.order_by(PrinterModel.model_name.asc())
+    paginated = printers.paginate(page=page, per_page=per_page, error_out=False)
+
+    models = [{
+        'id': model.id,
+        'model_name': model.model_name,
+        'ink_type': model.ink_type
+    } for model in paginated.items]
+
+    pagination = {
+        'current_page': paginated.page,
+        'total_pages': paginated.pages,
+        'has_prev': paginated.has_prev,
+        'has_next': paginated.has_next,
+        'prev_num': paginated.prev_num,
+        'next_num': paginated.next_num,
+        'search': search,
+        'pages': [p if p else None for p in paginated.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2)]
+    }
+
+    return jsonify({'models': models, 'pagination': pagination})
+
+@app.route('/api/getPrinterModel', methods=['GET'])
+@login_required
+def get_printer_model():
+    """
+    Отримує дані моделі принтера за ID.
+
+    Args:
+        model_id (int): ID моделі.
+
+    Returns:
+        JSON: Дані моделі або помилка.
+    """
+    model_id = request.args.get('model_id')
+    if not model_id:
+        return jsonify({"success": False, "message": "ID моделі не вказано"}), 400
+
+    result = GetPrinterModelData(model_id)
+    if result["success"]:
+        return jsonify(result["data"]), 200
+    return jsonify({"success": False, "message": result["message"]}), 404
+
+@app.route('/api/createPrinterModel', methods=['POST'])
+@login_required
+@admin_required
+def create_printer_model():
+    """
+        Створює нову модель принтера.
+
+    Args:
+        JSON body: Словник із полями model_name, ink_type.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = CreatePrinterModel(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 201
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/deletePrinterModel', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_printer_model_api():
+    """
+    Видаляє модель за ID із логуванням.
+
+    Args:
+        JSON body: Словник із полем model_id.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    model_id = data.get('model_id') if data else None
+    if not model_id:
+        return jsonify({"success": False, "message": "ID моделі не вказано"}), 400
+
+    result = DeletePrinterModel(model_id, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/api/editPrinterModel', methods=['PATCH'])
+@login_required
+@admin_required
+def edit_printer_model_api():
+    """
+    Оновлює дані моделі.
+
+    Args:
+        JSON body: Словник із полями model_id, model_name, ink_type.
+
+    Returns:
+        JSON: Результат операції {"success": bool, "message": str}.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Дані не надіслано"}), 400
+
+    result = EditPrinterModel(data, current_user.id)
+    if result["success"]:
+        return jsonify({"success": True, "message": result["message"]}), 200
+    return jsonify({"success": False, "message": result["message"]}), 400
+
+@app.route('/export/printermodels_table', methods=['GET'])
+@login_required
+def export_printermodels_table():
+    """
+    Експортує список моделей принтерів у Excel.
+
+    Args:
+        search (str): Пошуковий запит.
+
+    Returns:
+        File: Excel-файл із даними.
+    """
+    search = request.args.get('search', '')
+
+    query = PrinterModel.query
+    if search:
+        try:
+            model_id = int(search)
+            query = query.filter(
+                or_(
+                    PrinterModel.model_name.ilike(f'%{search}%'),
+                    PrinterModel.id == model_id
+                )
+            )
+        except ValueError:
+            query = query.filter(PrinterModel.model_name.ilike(f'%{search}%'))
+
+    query = query.order_by(PrinterModel.model_name.asc())
+    models = query.all()
+
+    # Створюємо Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Список моделей принтерів"
+    headers = ["ID", "Назва", "Тип чорнил"]
+    ws.append(headers)
+
+    for model in models:
+        ink_type = 'Тонер' if model.ink_type == 0 else 'Рідкі чорнила' if model.ink_type == 1 else 'Стрічка'
+        ws.append([
+            model.id,
+            model.model_name,
+            ink_type
+        ])
+
+    # Налаштування ширини колонок
+    column_widths = {}
+    for row in ws.rows:
+        for i, cell in enumerate(row):
+            if cell.value:
+                value_length = len(str(cell.value))
+                column_widths[i] = max(column_widths.get(i, 10), value_length + 2)
+
+    for i, width in column_widths.items():
+        adjusted_width = max(10, min(width, 50))
+        ws.column_dimensions[chr(65 + i)].width = adjusted_width
+
+    # Зберігаємо файл
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"Список_моделей_принтерів_{timestamp}.xlsx"
+    return send_file(output, download_name=filename, as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+
 
 
 

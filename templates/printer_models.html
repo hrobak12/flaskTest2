@@ -2,93 +2,65 @@
 {% block title %}Моделі принтерів{% endblock %}
 {% block content %}
     <h1>Список моделей принтерів</h1>
-    <form method="GET" class="mb-3">
-        <div class="input-group">
-            <input type="text" name="search" class="form-control" placeholder="Пошук за назвою" value="{{ search }}">
-            <button type="submit" class="btn btn-primary">Шукати</button>
-            <a href="{{ url_for('printer_models') }}" class="btn btn-secondary">Скасувати</a>
+
+    <!-- Модальне вікно для додавання -->
+    <div class="modal fade" id="addPrinterModelModal" tabindex="-1" aria-labelledby="addPrinterModelModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addPrinterModelModalLabel">Додати модель принтера</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addPrinterModelForm" method="post" autocomplete="off">
+                        <div class="mb-3">
+                            <label for="add_model_name" class="form-label">Назва моделі</label>
+                            <input type="text" class="form-control" id="add_model_name" name="model_name" required autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label for="add_ink_type" class="form-label">Тип чорнил</label>
+                            <select class="form-select" id="add_ink_type" name="ink_type" required>
+                                <option value="0">Тонер</option>
+                                <option value="1">Рідкі чорнила</option>
+                                <option value="2">Стрічка</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Додати</button>
+                    </form>
+                </div>
+            </div>
         </div>
-    </form>
-    <div class="mb-3">
-        <a href="{{ url_for('add_printer_model') }}" class="btn btn-success">Додати модель</a>
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
     </div>
 
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Назва</th>
-                <th>Тип чорнил</th>
-                <th>Дії</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for model in models %}
-            <tr>
-                <td>{{ model.id }}</td>
-                <td>{{ model.model_name }}</td>
-                <td>
-                    {% if model.ink_type == 0 %}
-                        <span class="badge bg-dark">Тонер</span>
-                    {% elif model.ink_type == 1 %}
-                        <span class="badge bg-primary">Рідкі чорнила</span>
-                    {% else %}
-                        <span class="badge bg-dark-purple">Стрічка</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <a href="{{ url_for('edit_printer_model', model_id=model.id) }}" class="btn btn-warning btn-sm">Редагувати</a>
-                    <form action="{{ url_for('delete_printer_model', model_id=model.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Ви впевнені, що хочете видалити цю модель?');">
-                        <button type="submit" class="btn btn-danger btn-sm">Видалити</button>
+    <!-- Модальне вікно для редагування -->
+    <div class="modal fade" id="editPrinterModelModal" tabindex="-1" aria-labelledby="editPrinterModelModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editPrinterModelModalLabel">Редагувати модель принтера</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editPrinterModelForm" method="post" autocomplete="off">
+                        <input type="hidden" id="edit_model_id" name="model_id">
+                        <div class="mb-3">
+                            <label for="edit_model_name" class="form-label">Назва моделі</label>
+                            <input type="text" class="form-control" id="edit_model_name" name="model_name" required autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_ink_type" class="form-label">Тип чорнил</label>
+                            <select class="form-select" id="edit_ink_type" name="ink_type" required>
+                                <option value="0">Тонер</option>
+                                <option value="1">Рідкі чорнила</option>
+                                <option value="2">Стрічка</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Оновити</button>
                     </form>
-                    <button class="btn btn-primary btn-sm" onclick="openModal({{ model.id }}, '{{ model.model_name | escape }}')">Сумісність</button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Пагінація -->
-    <nav aria-label="Page navigation">
-        <ul class="pagination justify-content-center">
-            {% if pagination.has_prev %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('printer_models', page=pagination.prev_num, search=search) }}">Попередня</a>
-                </li>
-            {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link">Попередня</span>
-                </li>
-            {% endif %}
-            {% for page_num in pagination.iter_pages() %}
-                {% if page_num %}
-                    {% if page_num == pagination.page %}
-                        <li class="page-item active">
-                            <span class="page-link">{{ page_num }}</span>
-                        </li>
-                    {% else %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('printer_models', page=page_num, search=search) }}">{{ page_num }}</a>
-                        </li>
-                    {% endif %}
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                {% endif %}
-            {% endfor %}
-            {% if pagination.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('printer_models', page=pagination.next_num, search=search) }}">Наступна</a>
-                </li>
-            {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link">Наступна</span>
-                </li>
-            {% endif %}
-        </ul>
-    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Модальне вікно для сумісності -->
     <div class="modal fade" id="cartridgeModal" tabindex="-1" aria-labelledby="cartridgeModalLabel" aria-hidden="true">
@@ -136,34 +108,333 @@
         </div>
     </div>
 
-    <!-- Скрипти -->
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script> -->
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <input type="text" id="search" class="form-control" placeholder="Пошук за назвою або ID" value="{{ search|escape }}" style="max-width: 400px;">
+            <button id="clear-search" class="btn btn-danger btn-sm ms-2" title="Очистити пошук">
+                <span>×</span>
+            </button>
+        </div>
+        <div>
+            <a href="{{ url_for('export_printermodels_table') }}" class="btn btn-excel me-2">Звіт</a>
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addPrinterModelModal">Додати модель</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
+        </div>
+    </div>
+
+    <table class="table table-striped" id="printer-model-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Назва</th>
+                <th>Тип чорнил</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody id="printer-model-table-body">
+            <!-- Дані вставляються через JS -->
+        </tbody>
+    </table>
+
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center" id="pagination">
+            <!-- Пагінація оновлюється через JS -->
+        </ul>
+    </nav>
+
+    <style>
+        .actions-column {
+            white-space: nowrap;
+            vertical-align: middle;
+            }
+        #clear-search {
+            padding: 0.25rem 0.5rem;
+            }
+        .btn-excel {
+            background-color: #1D6F42;
+            color: white;
+            border: none;
+            }
+        .btn-excel:hover {
+            background-color: #155932;
+            color: white;
+            }
+        .list-group-item {
+            height: 38px;
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            cursor: pointer;
+            }
+        .list-group-item.active {
+            background-color: #007bff;
+            color: white;
+            }
+        .transfer-buttons {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 10px;
+            }
+        .list-container {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            }
+        .badge.bg-dark-purple {
+            background-color: #6f42c1;
+            }
+    </style>
+{% endblock %}
+
+{% block scripts %}
     <script>
+        let timeout;
+        const searchInput = document.getElementById('search');
+        const clearSearchBtn = document.getElementById('clear-search');
+        const addPrinterModelModal = new bootstrap.Modal(document.getElementById('addPrinterModelModal'));
+        const editPrinterModelModal = new bootstrap.Modal(document.getElementById('editPrinterModelModal'));
+        const cartridgeModal = new bootstrap.Modal(document.getElementById('cartridgeModal'));
         let currentPrinterId = null;
 
-        // Відкриття модального вікна
-        async function openModal(printerId, printerName) {
+        // Очистка полів при відкритті модальних вікон
+        document.getElementById('addPrinterModelModal').addEventListener('show.bs.modal', function() {
+            document.getElementById('add_model_name').value = '';
+            document.getElementById('add_ink_type').selectedIndex = 0;
+        });
+
+        // Завантаження даних при ініціалізації
+        window.addEventListener('DOMContentLoaded', (event) => {
+            const initialSearch = searchInput.value.trim();
+            fetchPrinterModels(initialSearch, 1);
+        });
+
+        // Пошук із debounce
+        searchInput.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const searchValue = this.value.trim();
+            timeout = setTimeout(() => {
+                fetchPrinterModels(searchValue, 1);
+            }, 300);
+        });
+
+        // Очистка пошуку
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            fetchPrinterModels('', 1);
+        });
+
+        // Очистка за Esc
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' || event.keyCode === 27) {
+                searchInput.value = '';
+                fetchPrinterModels('', 1);
+            }
+        });
+
+        // Завантаження моделей
+        function fetchPrinterModels(search, page) {
+            fetch(`/api/printermodels?search=${encodeURIComponent(search)}&page=${page}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateTable(data.models);
+                updatePagination(data.pagination);
+            })
+            .catch(error => console.error('Помилка:', error));
+        }
+
+        // Оновлення таблиці
+        function updateTable(models) {
+            const tbody = document.getElementById('printer-model-table-body');
+            tbody.innerHTML = '';
+            models.forEach(model => {
+                const inkType = model.ink_type === 0 ? 'Тонер' : model.ink_type === 1 ? 'Рідкі чорнила' : 'Стрічка';
+                const badgeClass = model.ink_type === 0 ? 'bg-dark' : model.ink_type === 1 ? 'bg-primary' : 'bg-dark-purple';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${model.id}</td>
+                    <td>${model.model_name}</td>
+                    <td><span class="badge ${badgeClass}">${inkType}</span></td>
+                    <td class="actions-column">
+                        <button class="btn btn-warning btn-sm edit-btn" data-model-id="${model.id}" data-bs-toggle="modal" data-bs-target="#editPrinterModelModal">Редагувати</button>
+                        <button class="btn btn-danger btn-sm delete-btn" onclick="deletePrinterModel(${model.id})">Видалити</button>
+                        <button class="btn btn-primary btn-sm" onclick="openCartridgeModal(${model.id}, '${model.model_name.replace(/'/g, "\\'")}')">Сумісність</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Обробники для редагування
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const modelId = this.getAttribute('data-model-id');
+                    fetch(`/api/getPrinterModel?model_id=${modelId}`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data) {
+                            document.getElementById('edit_model_id').value = data.id;
+                            document.getElementById('edit_model_name').value = data.model_name;
+                            document.getElementById('edit_ink_type').value = data.ink_type;
+                        } else {
+                            alert('Модель не знайдено');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Помилка:', error);
+                        alert('Помилка при отриманні даних моделі');
+                    });
+                });
+            });
+        }
+
+        // Оновлення пагінації
+        function updatePagination(pagination) {
+            const paginationUl = document.getElementById('pagination');
+            paginationUl.innerHTML = '';
+
+            if (pagination.has_prev) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchPrinterModels('${pagination.search}', ${pagination.prev_num}); return false;">Попередня</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Попередня</span></li>`;
+            }
+
+            pagination.pages.forEach(page => {
+                if (page === null) {
+                    paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                } else if (page === pagination.current_page) {
+                    paginationUl.innerHTML += `<li class="page-item active"><span class="page-link">${page}</span></li>`;
+                } else {
+                    paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchPrinterModels('${pagination.search}', ${page}); return false;">${page}</a></li>`;
+                }
+            });
+
+            if (pagination.has_next) {
+                paginationUl.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="fetchPrinterModels('${pagination.search}', ${pagination.next_num}); return false;">Наступна</a></li>`;
+            } else {
+                paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Наступна</span></li>`;
+            }
+        }
+
+        // Додавання моделі
+        document.getElementById('addPrinterModelForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/createPrinterModel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addPrinterModelModal.hide();
+                    this.reset();
+                    fetchPrinterModels('', 1);
+                    alert('Модель додано!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при додаванні моделі');
+            });
+        });
+
+        // Редагування моделі
+        document.getElementById('editPrinterModelForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            fetch('/api/editPrinterModel', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    editPrinterModelModal.hide();
+                    fetchPrinterModels('', 1);
+                    alert('Модель оновлено!');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при редагуванні моделі');
+            });
+        });
+
+        // Видалення моделі
+        function deletePrinterModel(modelId) {
+            if (confirm('Ви впевнені, що хочете видалити цю модель?')) {
+                fetch('/api/deletePrinterModel', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_id: modelId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        fetchPrinterModels('', 1);
+                        alert('Модель видалено!');
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Помилка:', error);
+                    alert('Помилка при видаленні моделі');
+                });
+            }
+        }
+
+        // Відкриття модального вікна сумісності
+        async function openCartridgeModal(printerId, printerName) {
             currentPrinterId = printerId;
             document.getElementById('printerName').textContent = printerName;
             await loadCartridges(printerId);
-            new bootstrap.Modal(document.getElementById('cartridgeModal')).show();
+            cartridgeModal.show();
         }
 
         // Завантаження списків картриджів
         async function loadCartridges(printerId) {
-            const response = await fetch(`/api/compatible_cartridges/${printerId}`);
-            const { available, compatible } = await response.json();
+            try {
+                const response = await fetch(`/api/compatible_cartridges/${printerId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                const { available, compatible } = await response.json();
 
-            const availableList = document.getElementById('availableCartridges');
-            const compatibleList = document.getElementById('compatibleCartridges');
-            availableList.innerHTML = available.map(c => `
-                <li class="list-group-item" data-id="${c.id}" ondblclick="moveCartridge(${c.id}, 'right')">${c.model_name}</li>
-            `).join('');
-            compatibleList.innerHTML = compatible.map(c => `
-                <li class="list-group-item" data-id="${c.id}" data-notes="${c.notes || ''}" ondblclick="moveCartridge(${c.id}, 'left')">${c.model_name}</li>
-            `).join('');
+                const availableList = document.getElementById('availableCartridges');
+                const compatibleList = document.getElementById('compatibleCartridges');
+                availableList.innerHTML = available.map(c => `
+                    <li class="list-group-item" data-id="${c.id}" ondblclick="moveCartridge(${c.id}, 'right')">${c.model_name}</li>
+                `).join('');
+                compatibleList.innerHTML = compatible.map(c => `
+                    <li class="list-group-item" data-id="${c.id}" data-notes="${c.notes || ''}" ondblclick="moveCartridge(${c.id}, 'left')">${c.model_name}</li>
+                `).join('');
 
-            document.getElementById('notesInput').value = '';
+                document.getElementById('notesInput').value = '';
+            } catch (error) {
+                console.error('Помилка:', error);
+                alert('Помилка при завантаженні картриджів');
+            }
         }
 
         // Перенесення картриджа
@@ -175,6 +446,27 @@
                 document.getElementById(targetList).appendChild(item);
                 item.ondblclick = () => moveCartridge(cartridgeId, direction === 'right' ? 'left' : 'right');
                 item.classList.remove('active');
+                if (direction === 'left') {
+                    // Викликаємо DELETE для видалення зв’язку
+                    deleteCompatibilityLink(currentPrinterId, cartridgeId);
+                }
+            }
+        }
+
+        // Видалення зв’язку через DELETE ендпоінт
+        async function deleteCompatibilityLink(printerId, cartridgeId) {
+            try {
+                const response = await fetch(`/api/compatible_cartridges/${printerId}/${cartridgeId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Помилка видалення');
+            } catch (error) {
+                console.error('Помилка:', error);
+                alert(`Помилка при видаленні зв’язку: ${error.message}`);
+                // Повертаємо елемент назад, якщо видалення не вдалося
+                moveCartridge(cartridgeId, 'right');
             }
         }
 
@@ -183,6 +475,7 @@
             const selected = document.querySelectorAll('#availableCartridges li.list-group-item.active');
             selected.forEach(item => moveCartridge(item.dataset.id, 'right'));
         });
+
         document.getElementById('moveLeft').addEventListener('click', () => {
             const selected = document.querySelectorAll('#compatibleCartridges li.list-group-item.active');
             selected.forEach(item => moveCartridge(item.dataset.id, 'left'));
@@ -222,59 +515,29 @@
             });
         });
 
-        // Збереження змін
+        // Збереження змін сумісності
         document.getElementById('saveChanges').addEventListener('click', async () => {
             const compatibleItems = document.querySelectorAll('#compatibleCartridges li');
-            const updates = Array.from(compatibleItems).map(item => ({
+            const cartridges = Array.from(compatibleItems).map(item => ({
                 cartridge_model_id: parseInt(item.dataset.id),
                 notes: item.dataset.notes || document.getElementById('notesInput').value
             }));
 
-            const response = await fetch(`/api/compatible_cartridges/${currentPrinterId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cartridges: updates })
-            });
-
-            if (response.ok) {
-                bootstrap.Modal.getInstance(document.getElementById('cartridgeModal')).hide();
+            try {
+                const response = await fetch(`/api/compatible_cartridges/${currentPrinterId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cartridges })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Помилка збереження');
+                cartridgeModal.hide();
                 await loadCartridges(currentPrinterId);
-            } else {
-                const error = await response.json();
-                alert(`Помилка: ${error.error}`);
+                alert('Сумісність оновлено!');
+            } catch (error) {
+                console.error('Помилка:', error);
+                alert(`Помилка при збереженні змін: ${error.message}`);
             }
         });
     </script>
-    <style>
-        .table th, .table td {
-            height: 38px;
-            vertical-align: middle;
-            padding: 0.5rem;
-        }
-        .list-group-item {
-            height: 38px;
-            display: flex;
-            align-items: center;
-            padding: 0.5rem;
-            cursor: pointer;
-        }
-        .list-group-item.active {
-            background-color: #007bff;
-            color: white;
-        }
-        .transfer-buttons {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            gap: 10px;
-        }
-        .list-container {
-            height: 300px;
-            overflow-y: auto;
-            border: 1px solid #dee2e6;
-        }
-        .badge.bg-dark-purple {
-            background-color: #6f42c1;
-        }
-    </style>
 {% endblock %}
