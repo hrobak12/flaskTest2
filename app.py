@@ -4,8 +4,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, abo
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from sqlalchemy import func, and_, asc, desc, extract, or_
 
-from datetime import datetime
-import bcrypt
+#from datetime import datetime
+#import bcrypt
 from openpyxl import Workbook
 from reportlab.lib.pagesizes import A4, mm #, A5, landscape, portrait
 from reportlab.pdfgen import canvas
@@ -16,8 +16,8 @@ from barcode import Code128
 from barcode.writer import ImageWriter
 from transliterate import translit
 
-from models import (db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog,
-                    CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance, CompatibleServices)
+#from models import (db, User, RefillDept, PrinterModel, CustomerEquipment, Cartridges, CartridgeStatus, EventLog,
+#                    CartridgeModel, CompatibleCartridges, Contracts, ContractsServicesBalance, CompatibleServices)
 
 from config import status_map
 from services import *
@@ -624,15 +624,6 @@ def export_cartridge_history(cartridge_id):
     ws.title = f"Історія_{serial_num}"
     headers = ["Дата", "Статус", "Відділ", "Трек-номер", "Оновлено користувачем"]
     ws.append(headers)
-#    status_map = {
-#        0: 'Не вказано',
-#        1: 'На зберіганні (порожній)',
-#        2: 'Відправлено в користування',
-#        3: 'Відправлено на заправку',
-#       4: 'Непридатний (списаний)',
-#        5: 'Одноразовий (фарба у банці)',
-#        6: 'На зберіганні (заправлений)'
-#    }
     for event in history_data:
         ws.append([event['date_ofchange'], status_map.get(event['status'], 'Невідомий'),
                    event['dept_name'], event['parcel_track'], event['user_login']])
@@ -2740,6 +2731,31 @@ def get_depts():
     }
 
     return jsonify({'depts': depts, 'pagination': pagination})
+
+@app.route('/api/dept_history', methods=['GET'])
+@login_required
+def dept_history():
+    """
+    Повертає історію видачі картриджів для підрозділу за ID або назвою.
+
+    Args:
+        id (int): ID підрозділу.
+        name (str): Назва підрозділу.
+
+    Returns:
+        JSON: Список словників із полями serial_number, date_ofchange, parcel_track.
+    """
+    dept_id = request.args.get('id', type=int)
+    dept_name = request.args.get('name', '').strip()
+
+    result = GetDeptCartridgeHistory(dept_id=dept_id, dept_name=dept_name)
+
+    if not result["success"]:
+        status_code = 400 if "Потрібно вказати" in result["message"] else 404
+        return jsonify({'error': result["message"]}), status_code
+
+    return jsonify(result["data"])
+
 
 @app.route('/export/departments_table', methods=['GET'])
 @login_required

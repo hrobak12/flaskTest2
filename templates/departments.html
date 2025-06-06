@@ -3,6 +3,36 @@
 {% block content %}
     <h1>Список відділів</h1>
 
+    <!-- Модальне вікно для історії видачі картриджів -->
+    <div class="modal fade" id="deptHistoryModal" tabindex="-1" aria-labelledby="deptHistoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="deptHistoryModalLabel">Історія видачі картриджів для відділу</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Серійний номер</th>
+                                <th>Модель картриджа</th>
+                                <th>Дата видачі</th>
+                                <th>Трек-номер</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dept-history-table-body">
+                            <!-- Дані завантажуються через JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальне вікно для додавання -->
     <div class="modal fade" id="addDeptModal" tabindex="-1" aria-labelledby="addDeptModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -89,7 +119,7 @@
                         </div>
                         <div class="mb-3">
                             <label for="edit_addr4" class="form-label">Адреса 4</label>
-                            <input type="text" class="form-control" id="edit_addr4"></input>
+                            <input type="text" class="form-control" id="edit_addr4" name="addr4">
                         </div>
                         <div class="mb-3">
                             <label for="edit_addr5" class="form-label">Адреса 5</label>
@@ -119,7 +149,7 @@
         </div>
         <div>
             <a href="{{ url_for('export_departments_table') }}" class="btn btn-excel me-2">Звіт</a>
-            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addDeptModal">Додати відділ</button>
+            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addDeptModal">Додати відділ</button>
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Назад</a>
         </div>
     </div>
@@ -127,7 +157,6 @@
     <table class="table table-striped" id="dept-table">
         <thead>
             <tr>
-                <th>ID</th>
                 <th>Назва</th>
                 <th>Тип</th>
                 <th>Дії</th>
@@ -171,6 +200,7 @@
         const clearSearchBtn = document.getElementById('clear-search');
         const addDeptModal = new bootstrap.Modal(document.getElementById('addDeptModal'));
         const editDeptModal = new bootstrap.Modal(document.getElementById('editDeptModal'));
+        const deptHistoryModal = new bootstrap.Modal(document.getElementById('deptHistoryModal'));
 
         // Завантаження даних при ініціалізації
         window.addEventListener('DOMContentLoaded', (event) => {
@@ -224,8 +254,7 @@
                 const typeLabel = dept.is_exec == 0 ? 'Клієнт' : dept.is_exec == 1 ? 'Внутрішній виконавець' : 'Зовнішній виконавець';
                 const typeClass = dept.is_exec == 0 ? 'bg-primary' : 'bg-success';
                 row.innerHTML = `
-                    <td>${dept.id}</td>
-                    <td>${dept.deptname}</td>
+                    <td><a href="#" class="dept-link" data-dept-id="${dept.id}" onclick="showDeptHistory(${dept.id}); return false;">${dept.deptname}</a></td>
                     <td><span class="badge ${typeClass}">${typeLabel}</span></td>
                     <td class="actions-column">
                         <button class="btn btn-warning btn-sm edit-btn" data-dept-id="${dept.id}" data-bs-toggle="modal" data-bs-target="#editDeptModal">Редагувати</button>
@@ -296,6 +325,48 @@
             } else {
                 paginationUl.innerHTML += `<li class="page-item disabled"><span class="page-link">Наступна</span></li>`;
             }
+        }
+
+        // Показ історії видачі картриджів для відділу
+        function showDeptHistory(deptId) {
+            fetch(`/api/dept_history?id=${deptId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    updateDeptHistoryTable(data);
+                    deptHistoryModal.show();
+                }
+            })
+            .catch(error => {
+                console.error('Помилка:', error);
+                alert('Помилка при отриманні історії видачі');
+            });
+        }
+
+        // Оновлення таблиці історії
+        function updateDeptHistoryTable(history) {
+            const tbody = document.getElementById('dept-history-table-body');
+            tbody.innerHTML = '';
+            history.forEach(event => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${event.serial_num || 'Не вказано'}</td>
+                    <td>${event.model_name || 'Не вказано'}</td>
+                    <td>${new Date(event.date_ofchange).toLocaleString()}</td>
+                    <td>${event.parcel_track || 'Не вказано'}</td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
         // Додавання відділу

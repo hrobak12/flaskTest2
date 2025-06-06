@@ -1057,3 +1057,77 @@ def EditCartridgeModel(data: dict, current_user_id: int) -> dict:
         db.session.rollback()
         return {"success": False, "message": f"Помилка: {str(e)}"}
 # -----------------------------------------------------------------------------------------------------------------------
+from sqlalchemy import or_
+from models import CartridgeStatus, Cartridges, RefillDept
+
+def GetDeptCartridgeHistory(dept_id: int = None, dept_name: str = None) -> dict:
+    """
+    Отримує історію видачі картриджів для підрозділу за ID або назвою.
+
+    Args:
+        dept_id (int, optional): ID підрозділу.
+        dept_name (str, optional): Назва підрозділу.
+
+    Returns:
+        dict: Результат {"success": bool, "message": str, "data": list}.
+              data - список словників із serial_num, model_name, date_ofchange, parcel_track.
+    """
+    try:
+        if not dept_id and not dept_name:
+            return {
+                "success": False,
+                "message": "Потрібно вказати ID або назву підрозділу",
+                "data": []
+            }
+
+        # Шукаємо підрозділ
+        dept = None
+        if dept_id:
+            dept = RefillDept.query.get(dept_id)
+        elif dept_name:
+            dept = RefillDept.query.filter_by(deptname=dept_name).first()
+
+        if not dept:
+            return {
+                "success": False,
+                "message": "Підрозділ не знайдено",
+                "data": []
+            }
+
+        # Отримуємо історію з явним вибором моделей
+        history = (
+            db.session.query(CartridgeStatus, Cartridges, CartridgeModel)
+            .join(Cartridges, CartridgeStatus.cartridge_id == Cartridges.id)
+            .join(CartridgeModel, Cartridges.cartrg_model_id == CartridgeModel.id)
+            .filter(
+                CartridgeStatus.exec_dept == dept.id,
+                CartridgeStatus.status.in_([2, 5])
+            )
+            .order_by(CartridgeStatus.date_ofchange.desc())
+            .all()
+        )
+
+        # Формуємо результат
+        result = [
+            {
+                'serial_num': cartridge.serial_num,
+                'model_name': model.model_name,
+                'date_ofchange': status.date_ofchange.isoformat() if status.date_ofchange else None,
+                'parcel_track': status.parcel_track
+            }
+            for status, cartridge, model in history
+        ]
+
+        return {
+            "success": True,
+            "message": "Дані отримано",
+            "data": result
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Помилка: {str(e)}",
+            "data": []
+        }
+# -----------------------------------------------------------------------------------------------------------------------
