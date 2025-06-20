@@ -49,6 +49,60 @@ FROM cartridges
 #        db.session.commit()
 #        print("Індекси створено або вже існують.")
 
+from sqlalchemy.sql import text  # Додано імпорт text
+
+with app.app_context():
+    try:
+        # 1. Створюємо нову таблицю cartrg_status_new з полем device_id і зовнішнім ключем
+        db.session.execute(text("""
+            CREATE TABLE cartrg_status_new (
+                id INTEGER PRIMARY KEY,
+                cartridge_id INTEGER,
+                status INTEGER DEFAULT 0,
+                date_ofchange DATETIME DEFAULT CURRENT_TIMESTAMP,
+                parcel_track VARCHAR(13),
+                exec_dept INTEGER,
+                device_id INTEGER,
+                user_updated INTEGER,
+                time_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (cartridge_id) REFERENCES cartridges(id),
+                FOREIGN KEY (exec_dept) REFERENCES refill_dept(id),
+                FOREIGN KEY (user_updated) REFERENCES users(id),
+                FOREIGN KEY (device_id) REFERENCES custmr_equip(id)
+            )
+        """))
+        print("Таблицю cartrg_status_new створено.")
+
+        # 2. Переносимо дані зі старої таблиці
+        db.session.execute(text("""
+            INSERT INTO cartrg_status_new (
+                id, cartridge_id, status, date_ofchange, parcel_track, exec_dept,
+                user_updated, time_updated
+            )
+            SELECT 
+                id, cartridge_id, status, date_ofchange, parcel_track, exec_dept,
+                user_updated, time_updated
+            FROM cartrg_status
+        """))
+        print("Дані перенесено до cartrg_status_new.")
+
+        # 4. Видаляємо стару таблицю
+        db.session.execute(text("DROP TABLE cartrg_status"))
+        print("Стару таблицю cartrg_status видалено.")
+
+        # 5. Перейменовуємо cartrg_status_new на cartrg_status
+        db.session.execute(text("ALTER TABLE cartrg_status_new RENAME TO cartrg_status"))
+        print("Таблицю cartrg_status_new перейменовано на cartrg_status.")
+
+        # 6. Активуємо перевірку зовнішніх ключів (опціонально, якщо потрібно)
+        db.session.execute(text("PRAGMA foreign_keys = ON"))
+        print("Перевірку зовнішніх ключів увімкнено.")
+
+        db.session.commit()
+        print("Базу даних успішно оновлено.")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Помилка при оновленні бази даних: {e}")
 
 #*********************************************************
 with app.app_context():

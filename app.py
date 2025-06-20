@@ -53,6 +53,7 @@ def admin_required(f):
     return wrapper
 
 #*************
+
 #тут може бути скрипт міграції, якщо потрібно
 
 with app.app_context():
@@ -210,7 +211,9 @@ def add_cartridge_event():
         parcel_track=parcel_track,
         exec_dept=int(exec_dept),
         user_updated=current_user.id,
-        time_updated=datetime.now()
+        time_updated=datetime.now(),
+#upd 20.06.2025 якщо картридж був вставлений в принтер, це додається до події
+        device_id=int(printer) if printer else None
     )
     db.session.add(new_status)
 
@@ -1081,7 +1084,9 @@ def mass_add_cartridge_events():
             exec_dept=int(exec_dept),
             parcel_track=parcel_track if status == 3 else None,
             user_updated=current_user.id,
-            time_updated=datetime.now()
+            time_updated=datetime.now(),
+        # upd 20.06.2025 якщо картридж був вставлений в принтер, це додається до події
+            device_id = int(printer) if printer and status == 2 else None
         )
         db.session.add(new_status)
         report_data.append({
