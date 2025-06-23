@@ -1227,7 +1227,13 @@ def update_cartridge_barcodes():
                 cartridge.curr_parcel_track = barcode
             else:
                 # Якщо картридж не знайдено, логувати помилку, але не переривати цикл
-                current_app.logger.error(f"Картридж з ID {cartridge_id} не знайдено в таблиці Cartridges")
+                #current_app.logger.error(f"Картридж з ID {cartridge_id} не знайдено в таблиці Cartridges")
+                event = EventLog(
+                    table_name='Cartridges',
+                    event_type=13,
+                    user_updated=current_user.id
+                )
+                db.session.add(event)
 
         db.session.commit()
         return jsonify({'success': True}), 200
