@@ -1567,7 +1567,6 @@ def get_compatible_cartridges(printer_model_id):
 # Оновлення зв’язків сумісності
 @app.route('/api/compatible_cartridges/<int:printer_model_id>', methods=['POST'])
 @login_required
-@admin_required
 def update_compatible_cartridges(printer_model_id):
     if not PrinterModel.query.get(printer_model_id):
         return jsonify({'error': 'Printer model not found'}), 404
@@ -1610,7 +1609,6 @@ def update_compatible_cartridges(printer_model_id):
 # Видалення конкретного зв’язку
 @app.route('/api/compatible_cartridges/<int:printer_model_id>/<int:cartridge_model_id>', methods=['DELETE'])
 @login_required
-@admin_required
 def delete_compatible_cartridge(printer_model_id, cartridge_model_id):
     link = CompatibleCartridges.query.filter_by(
         printer_model_id=printer_model_id,
@@ -1784,6 +1782,7 @@ def page_not_found(e):
 # CRUD для Contracts
 @app.route('/contracts')
 @login_required
+@admin_required
 def contracts():
     search = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)
@@ -2296,7 +2295,6 @@ def get_statuses():
 #=======================================================================================================================
 @app.route('/cartridges')
 @login_required
-@admin_required
 def cartridges():
     search = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)  # Отримуємо номер сторінки з URL
@@ -2387,6 +2385,7 @@ def remove_cartridge():
 #=======================================================================================================================
 @app.route('/api/modifyCartridge', methods=['PATCH'])
 @login_required
+@admin_required
 def modify_cartridge():
     """
     Оновлює дані картриджа.
