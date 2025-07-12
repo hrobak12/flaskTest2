@@ -1,48 +1,10 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script>{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Масовий ввід картриджів{% endblock %}
 {% block content %}
 <h1>Масовий ввід картриджів</h1>
 
 <div class="row mt-4">
+    <!-- Секція Видача -->
     <div class="col-md-4">
         <h3>Видача картриджів</h3>
         <div class="card p-3 mb-3">
@@ -50,6 +12,7 @@
             <button class="btn btn-warning" onclick="openMassModal('issue_empty', 3)">Видача порожніх (на заправку)</button>
         </div>
     </div>
+    <!-- Секція Прийом -->
     <div class="col-md-4">
         <h3>Прийом картриджів</h3>
         <div class="card p-3 mb-3">
@@ -57,6 +20,7 @@
             <button class="btn btn-secondary" onclick="openMassModal('receive_empty', 1)">Прийом порожніх (на заправку)</button>
         </div>
     </div>
+    <!-- Секція Індивідуальна обробка -->
     <div class="col-md-4">
         <h3>Індивідуальна обробка</h3>
         <div class="card p-3 mb-3">
@@ -65,6 +29,7 @@
     </div>
 </div>
 
+<!-- Модальне вікно для масового введення та індивідуальної обробки -->
 <div class="modal fade" id="massInputModal" tabindex="-1" aria-labelledby="massInputModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -84,15 +49,8 @@
                     </div>
                     <div class="mb-3" id="status_field" style="display: none;">
                         <label for="status_select" class="form-label">Статус</label>
-                        <select class="form-select" id="status_select" name="status_select" disabled>
-                            <option value="0">Не вказано</option>
-                            <option value="1">На зберіганні (порожній)</option>
-                            <option value="2">Відправлено в користування</option>
-                            <option value="3">Відправлено на заправку</option>
-                            <option value="4">Непридатний (списаний)</option>
-                            <option value="5">Одноразовий (фарба у банці)</option>
-                            <option value="6">На зберіганні (заправлений)</option>
-                            <option value="7">Втрачений</option>
+                        <select class="form-select" id="status_select" name="status_select">
+                            <option value="">Завантаження статусів...</option>
                         </select>
                     </div>
                     <div class="card" id="cartridge_table" style="display: none;">
@@ -107,14 +65,16 @@
                                             <th class="col-action">Дія</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="mass-input-table-body"></tbody>
+                                    <tbody id="mass-input-table-body">
+                                        <!-- Дані додаються через JS -->
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
                     <div class="mt-3">
                         <label for="exec_dept" class="form-label">Відділ</label>
-                        <select class="form-select" id="exec_dept" name="exec_dept" required disabled>
+                        <select class="form-select" id="exec_dept" name="exec_dept" required>
                             <option value="">Виберіть відділ</option>
                             {% for dept in RefillDept.query.all()|sort(attribute='deptname') %}
                                 <option value="{{ dept.id }}">{{ dept.deptname }}</option>
@@ -129,14 +89,14 @@
                     </div>
                     <div class="mt-3" id="parcel_track_field" style="display: none;">
                         <label for="parcel_track" class="form-label">Трек-номер (необов’язково)</label>
-                        <input type="text" class="form-control" id="parcel_track" name="parcel_track" maxlength="13" placeholder="Трек-номер" disabled>
+                        <input type="text" class="form-control" id="parcel_track" name="parcel_track" maxlength="13" placeholder="Трек-номер">
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ukrposhta me-auto" id="printLabelBtn" style="display: none;" disabled>Друкувати ярлик</button>
+                <button type="button" class="btn btn-ukrposhta me-auto" id="printLabelBtn" style="display: none;">Друкувати ярлик</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
-                <button type="button" class="btn btn-primary" id="confirmMassInput" disabled>Підтвердити</button>
+                <button type="button" class="btn btn-primary" id="confirmMassInput">Підтвердити</button>
             </div>
         </div>
     </div>
@@ -220,15 +180,13 @@
     const cartridgeTable = document.getElementById('cartridge_table');
     const printLabelBtn = document.getElementById('printLabelBtn');
     const statusSelect = document.getElementById('status_select');
-    const confirmMassInput = document.getElementById('confirmMassInput');
 
     let cartridges = [];
     let currentOperation = '';
-    let currentStatus = null;
+    let currentStatus = 0;
     let selectedIndex = -1;
     let allDepts = [];
 
-    // Завантаження відділів
     fetch('/api/departments')
         .then(response => response.json())
         .then(data => {
@@ -236,7 +194,6 @@
         })
         .catch(error => console.error('Помилка завантаження відділів:', error));
 
-    // Відкриття модального вікна
     function openMassModal(operation, status) {
         currentOperation = operation;
         currentStatus = status;
@@ -244,45 +201,24 @@
         document.getElementById('status').value = status || '';
         document.getElementById('massInputModalLabel').textContent = getModalTitle(operation);
 
-        // Налаштування полів
         parcelTrackField.style.display = (operation === 'issue_empty' || operation === 'single_process') ? 'block' : 'none';
         printerField.style.display = (operation === 'issue_filled' || operation === 'single_process') ? 'block' : 'none';
         statusField.style.display = (operation === 'single_process') ? 'block' : 'none';
         cartridgeTable.style.display = (operation !== 'single_process') ? 'block' : 'none';
         printLabelBtn.style.display = (operation === 'issue_empty' || operation === 'single_process') ? 'inline-block' : 'none';
 
-        // Очищення
         cartridges = [];
         tableBody.innerHTML = '';
         document.getElementById('massInputForm').reset();
         suggestionsDropdown.innerHTML = '';
         suggestionsDropdown.classList.remove('show');
         printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
+        printerSelect.disabled = true;
         clearError();
 
-        // Налаштування для single_process (Етап 0)
-        if (operation === 'single_process') {
-            statusSelect.disabled = true;
-            execDeptSelect.disabled = true;
-            printerSelect.disabled = true;
-            document.getElementById('parcel_track').disabled = true;
-            printLabelBtn.disabled = true;
-            confirmMassInput.disabled = true;
-            serialInput.value = '';
-        } else {
-            // Для інших операцій
-            statusSelect.disabled = false;
-            execDeptSelect.disabled = false;
-            printerSelect.disabled = operation === 'issue_filled';
-            document.getElementById('parcel_track').disabled = operation !== 'issue_empty';
-            printLabelBtn.disabled = operation !== 'issue_empty';
-            confirmMassInput.disabled = false;
-        }
-
-        // Заповнення відділів
         execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
-        const deptsToShow = (operation === 'issue_empty' || operation === 'receive_filled')
-            ? allDepts.filter(dept => dept.is_exec === 1)
+        const deptsToShow = (operation === 'issue_empty' || operation === 'receive_filled' || operation === 'receive_empty')
+            ? allDepts.filter(dept => dept.is_exec > 0)
             : allDepts;
         deptsToShow
             .sort((a, b) => a.deptname.localeCompare(b.deptname))
@@ -293,10 +229,27 @@
                 execDeptSelect.appendChild(option);
             });
 
+        if (operation === 'single_process') {
+            fetch('/api/statuses')
+                .then(response => response.json())
+                .then(data => {
+                    statusSelect.innerHTML = '';
+                    data.forEach(status => {
+                        const option = document.createElement('option');
+                        option.value = status.status_id;
+                        option.textContent = status.status_name;
+                        statusSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Помилка завантаження статусів:', error);
+                    statusSelect.innerHTML = '<option value="">Помилка завантаження статусів</option>';
+                });
+        }
+
         massInputModal.show();
     }
 
-    // Заголовок модального вікна
     function getModalTitle(operation) {
         switch (operation) {
             case 'issue_filled': return 'Видача заправлених картриджів';
@@ -308,12 +261,10 @@
         }
     }
 
-    // Фокус при відкритті
     document.getElementById('massInputModal').addEventListener('shown.bs.modal', () => {
         serialInput.focus();
     });
 
-    // Очищення при закритті
     document.getElementById('massInputModal').addEventListener('hidden.bs.modal', () => {
         document.getElementById('massInputForm').reset();
         suggestionsDropdown.innerHTML = '';
@@ -327,47 +278,38 @@
         cartridgeTable.style.display = 'none';
         printLabelBtn.style.display = 'none';
         printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
-        statusSelect.innerHTML = `
-            <option value="0">Не вказано</option>
-            <option value="1">На зберіганні (порожній)</option>
-            <option value="2">Відправлено в користування</option>
-            <option value="3">Відправлено на заправку</option>
-            <option value="4">Непридатний (списаний)</option>
-            <option value="5">Одноразовий (фарба у банці)</option>
-            <option value="6">На зберіганні (заправлений)</option>
-            <option value="7">Втрачений</option>
-        `;
+        printerSelect.disabled = true;
+        statusSelect.innerHTML = '<option value="">Завантаження статусів...</option>';
         clearError();
     });
 
-    // Автодоповнення (Етап 1)
     serialInput.addEventListener('input', debounce((e) => {
         const query = e.target.value.trim();
         if (query.length >= 2) {
             fetch(`/api/cartridges?search=${encodeURIComponent(query)}`)
                 .then(response => response.json())
                 .then(data => updateSuggestions(data.cartridges))
-                .catch(error => {
-                    console.error('Помилка:', error);
-                    showError('Помилка при автодоповненні!');
-                });
+                .catch(error => console.error('Помилка:', error));
         } else {
             suggestionsDropdown.innerHTML = '';
             suggestionsDropdown.classList.remove('show');
         }
     }, 300));
 
-    // Обробка клавіатури
     serialInput.addEventListener('keydown', (e) => {
         const items = suggestionsDropdown.querySelectorAll('.dropdown-item');
         if (e.key === 'Enter') {
             e.preventDefault();
             if (selectedIndex >= 0 && items[selectedIndex]) {
                 items[selectedIndex].click();
-            } else if (currentOperation !== 'single_process') {
+            } else {
                 const serialNum = serialInput.value.trim();
                 if (serialNum) {
-                    fetchCartridgeDetails(serialNum);
+                    if (currentOperation === 'single_process') {
+                        triggerBlurEvent();
+                    } else {
+                        fetchCartridgeDetails(serialNum);
+                    }
                 }
             }
         } else if (items.length > 0) {
@@ -383,7 +325,6 @@
         }
     });
 
-    // Оновлення пропозицій автодоповнення
     function updateSuggestions(cartridgesData) {
         suggestionsDropdown.innerHTML = '';
         selectedIndex = -1;
@@ -399,7 +340,7 @@
                     suggestionsDropdown.innerHTML = '';
                     suggestionsDropdown.classList.remove('show');
                     if (currentOperation === 'single_process') {
-                        loadCartridgeDetails(cartridge.serial_num);
+                        triggerBlurEvent();
                     } else {
                         fetchCartridgeDetails(cartridge.serial_num);
                     }
@@ -412,7 +353,6 @@
         }
     }
 
-    // Оновлення виділення в автодоповненні
     function updateSelection(items) {
         items.forEach((item, index) => {
             item.classList.toggle('active', index === selectedIndex);
@@ -422,7 +362,6 @@
         }
     }
 
-    // Отримання деталей картриджа (для масового введення)
     function fetchCartridgeDetails(serialNum) {
         fetch(`/api/cartridges?search=${encodeURIComponent(serialNum)}`)
             .then(response => response.json())
@@ -449,170 +388,15 @@
             })
             .catch(error => {
                 console.error('Помилка:', error);
+                const label = document.querySelector('label[for="serial_num"]');
+                label.classList.add('double-blink');
+                setTimeout(() => label.classList.remove('double-blink'), 1200);
+                serialInput.value = '';
+                serialInput.focus();
                 showError('Помилка при отриманні даних картриджа!');
             });
     }
 
-    // Завантаження деталей картриджа для single_process (Етап 2)
-    function loadCartridgeDetails(serialNum) {
-        fetch('/check_cartridge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ serial_num: serialNum })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.latest_status) {
-                const currStatus = data.latest_status.status || 0;
-                const modelType = data.model_type || 0;
-                configureSingleProcessFields(currStatus, modelType);
-                execDeptSelect.value = data.latest_status.exec_dept || '';
-                document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
-                clearError();
-            } else {
-                const label = document.querySelector('label[for="serial_num"]');
-                label.classList.add('double-blink');
-                setTimeout(() => label.classList.remove('double-blink'), 1200);
-                serialInput.focus();
-                serialInput.select();
-                showError('Картридж не знайдено або недійсний!');
-                resetSingleProcessFields();
-            }
-        })
-        .catch(error => {
-            console.error('Помилка:', error);
-            showError('Помилка при перевірці картриджа!');
-            resetSingleProcessFields();
-        });
-    }
-
-    // Налаштування полів для single_process
-    function configureSingleProcessFields(currStatus, modelType) {
-        // Скидаємо поля
-        resetSingleProcessFields();
-
-        // Статуси для вибору
-        const statusOptions = {
-            0: [1, 3, 4, 6, 7], // Не вказано
-            1: [3, 4, 7], // На зберіганні (порожній)
-            2: [1, 4, 6, 7], // Відправлено в користування
-            3: [1, 4, 6, 7], // Відправлено на заправку
-            4: [], // Непридатний (списаний)
-            5: [5], // Одноразовий (фарба у банці)
-            6: [1, 2, 4, 7], // На зберіганні (заправлений)
-            7: [1, 2, 3, 4, 6] // Втрачений
-        };
-
-        // Налаштування для model_type=4 (Рідкі чорнила)
-        if (modelType === 4) {
-            statusSelect.innerHTML = `<option value="5">Одноразовий (фарба у банці)</option>`;
-            statusSelect.disabled = false;
-            execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
-            allDepts
-                .filter(dept => dept.is_exec === 0)
-                .sort((a, b) => a.deptname.localeCompare(b.deptname))
-                .forEach(dept => {
-                    const option = document.createElement('option');
-                    option.value = dept.id;
-                    option.textContent = dept.deptname;
-                    execDeptSelect.appendChild(option);
-                });
-            execDeptSelect.disabled = false;
-            document.getElementById('parcel_track').disabled = false;
-            printLabelBtn.disabled = false;
-            confirmMassInput.disabled = false;
-            return;
-        }
-
-        // Налаштування для інших model_type
-        if (currStatus === 4) {
-            // Непридатний (списаний) - кінцевий стан
-            statusSelect.innerHTML = '<option value="">Немає доступних статусів</option>';
-            statusSelect.disabled = true;
-            execDeptSelect.innerHTML = '<option value="">Немає доступних відділів</option>';
-            execDeptSelect.disabled = true;
-            document.getElementById('parcel_track').disabled = true;
-            printerSelect.disabled = true;
-            printLabelBtn.disabled = true;
-            confirmMassInput.disabled = true;
-        } else {
-            // Заповнення статусів
-            statusSelect.innerHTML = '';
-            const availableStatuses = statusOptions[currStatus] || [];
-            if (availableStatuses.length > 0) {
-                availableStatuses.forEach(status => {
-                    const option = document.createElement('option');
-                    option.value = status;
-                    option.textContent = {
-                        1: 'На зберіганні (порожній)',
-                        2: 'Відправлено в користування',
-                        3: 'Відправлено на заправку',
-                        4: 'Непридатний (списаний)',
-                        5: 'Одноразовий (фарба у банці)',
-                        6: 'На зберіганні (заправлений)',
-                        7: 'Втрачений'
-                    }[status];
-                    statusSelect.appendChild(option);
-                });
-                statusSelect.disabled = false;
-            } else {
-                statusSelect.innerHTML = '<option value="">Немає доступних статусів</option>';
-                statusSelect.disabled = true;
-            }
-
-            // Заповнення відділів
-            execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
-            const deptsToShow = (currStatus === 0 || currStatus === 1 || currStatus === 2 || currStatus === 3 || currStatus === 7)
-                ? allDepts.filter(dept => dept.is_exec > 0)
-                : allDepts.filter(dept => dept.is_exec === 0);
-            deptsToShow
-                .sort((a, b) => a.deptname.localeCompare(b.deptname))
-                .forEach(dept => {
-                    const option = document.createElement('option');
-                    option.value = dept.id;
-                    option.textContent = dept.deptname;
-                    execDeptSelect.appendChild(option);
-                });
-            execDeptSelect.disabled = false;
-
-            // Активація інших полів
-            document.getElementById('parcel_track').disabled = false;
-            printLabelBtn.disabled = false;
-            confirmMassInput.disabled = false;
-        }
-    }
-
-    // Скидання полів для single_process
-    function resetSingleProcessFields() {
-        statusSelect.disabled = true;
-        execDeptSelect.disabled = true;
-        printerSelect.disabled = true;
-        document.getElementById('parcel_track').disabled = true;
-        printLabelBtn.disabled = true;
-        confirmMassInput.disabled = true;
-        statusSelect.innerHTML = `
-            <option value="0">Не вказано</option>
-            <option value="1">На зберіганні (порожній)</option>
-            <option value="2">Відправлено в користування</option>
-            <option value="3">Відправлено на заправку</option>
-            <option value="4">Непридатний (списаний)</option>
-            <option value="5">Одноразовий (фарба у банці)</option>
-            <option value="6">На зберіганні (заправлений)</option>
-            <option value="7">Втрачений</option>
-        `;
-        execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
-        allDepts
-            .sort((a, b) => a.deptname.localeCompare(b.deptname))
-            .forEach(dept => {
-                const option = document.createElement('option');
-                option.value = dept.id;
-                option.textContent = dept.deptname;
-                execDeptSelect.appendChild(option);
-            });
-        printerSelect.innerHTML = '<option value="">Спочатку виберіть відділ</option>';
-    }
-
-    // Оновлення таблиці (для масового введення)
     function updateTable() {
         tableBody.innerHTML = '';
         cartridges.forEach((cartridge, index) => {
@@ -627,18 +411,15 @@
         });
     }
 
-    // Видалення картриджа
     window.removeCartridge = function(index) {
         cartridges.splice(index, 1);
         updateTable();
         serialInput.focus();
     };
 
-    // Завантаження принтерів
     execDeptSelect.addEventListener('change', () => {
         const deptId = execDeptSelect.value;
-        const selectedDept = allDepts.find(dept => dept.id == deptId);
-        if (deptId && (currentOperation === 'issue_filled' || (currentOperation === 'single_process' && selectedDept && selectedDept.is_exec === 0))) {
+        if (deptId && (currentOperation === 'issue_filled' || currentOperation === 'single_process')) {
             fetch(`/api/printers_by_dept/${deptId}`)
                 .then(response => response.json())
                 .then(data => {
@@ -663,7 +444,63 @@
         }
     });
 
-    // Відправка форми
+    serialInput.addEventListener('blur', (e) => {
+        if (currentOperation !== 'single_process') return;
+        const serialNum = e.target.value.trim();
+        if (serialNum) {
+            let isModalOpen = massInputModal._isShown;
+            fetch('/check_cartridge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serial_num: serialNum })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (isModalOpen) {
+                    if (data.success && data.latest_status) {
+                        statusSelect.value = data.latest_status.status || '0';
+                        execDeptSelect.value = data.latest_status.exec_dept || '';
+                        document.getElementById('parcel_track').value = data.latest_status.parcel_track || '';
+                    } else {
+                        const label = document.querySelector('label[for="serial_num"]');
+                        label.classList.add('double-blink');
+                        setTimeout(() => label.classList.remove('double-blink'), 1200);
+                        serialInput.focus();
+                        serialInput.select();
+                        showError('Картридж не знайдено або недійсний!');
+                    }
+                }
+            })
+            .catch(error => {
+                if (isModalOpen) {
+                    const label = document.querySelector('label[for="serial_num"]');
+                    label.classList.add('double-blink');
+                    setTimeout(() => label.classList.remove('double-blink'), 1200);
+                    serialInput.focus();
+                    serialInput.select();
+                    showError('Помилка при перевірці картриджа!');
+                }
+            });
+        }
+    });
+
+    function triggerBlurEvent() {
+        const event = new Event('blur');
+        serialInput.dispatchEvent(event);
+    }
+
+    function showError(message) {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+
+    function clearError() {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = '';
+        errorDiv.style.display = 'none';
+    }
+
     document.getElementById('confirmMassInput').addEventListener('click', async () => {
         if (currentOperation !== 'single_process' && cartridges.length === 0) {
             showError('Додайте хоча б один картридж!');
@@ -693,7 +530,7 @@
                         clearError();
                     } else {
                         showError(data.message);
-                        if (data.message === 'Цей статус уже встановлено для картриджа!') {
+                        if (data.message.includes('Недостатньо балансу')) {
                             const statusLabel = document.querySelector('label[for="status_select"]');
                             statusLabel.classList.add('double-blink');
                             setTimeout(() => statusLabel.classList.remove('double-blink'), 1200);
@@ -738,7 +575,6 @@
         }
     });
 
-    // Друкування ярлика
     document.getElementById('printLabelBtn').addEventListener('click', () => {
         const deptId = execDeptSelect.value;
         if (deptId) {
@@ -748,21 +584,6 @@
         }
     });
 
-    // Функція для відображення помилки
-    function showError(message) {
-        const errorDiv = document.getElementById('error-message');
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-    }
-
-    // Функція для очищення помилки
-    function clearError() {
-        const errorDiv = document.getElementById('error-message');
-        errorDiv.textContent = '';
-        errorDiv.style.display = 'none';
-    }
-
-    // Debounce для автодоповнення
     function debounce(func, wait) {
         let timeout;
         return function (...args) {
