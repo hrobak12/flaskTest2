@@ -3471,6 +3471,7 @@ def edit_cartridge_model_api():
         return jsonify({"success": True, "message": result["message"]}), 200
     return jsonify({"success": False, "message": result["message"]}), 400
 
+
 @app.route('/export/cartridgemodels_table', methods=['GET'])
 @login_required
 def export_cartridgemodels_table():
