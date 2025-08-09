@@ -494,11 +494,11 @@
         // Статуси для вибору
         const statusOptions = {
             0: [1, 3, 4, 6, 7], // Не вказано
-            1: [3, 4, 7], // На зберіганні (порожній)
+            1: [3, 4, 5, 7], // На зберіганні (порожній)
             2: [1, 4, 6, 7], // Відправлено в користування
             3: [1, 4, 6, 7], // Відправлено на заправку
             4: [], // Непридатний (списаний)
-            5: [5], // Одноразовий (фарба у банці)
+            5: [5, 1], // Одноразовий (фарба у банці)
             6: [1, 2, 4, 7], // На зберіганні (заправлений)
             7: [1, 2, 3, 4, 6] // Втрачений
         };
@@ -562,7 +562,7 @@
 
             // Заповнення відділів
             execDeptSelect.innerHTML = '<option value="">Виберіть відділ</option>';
-            const deptsToShow = (currStatus === 0 || currStatus === 1 || currStatus === 2 || currStatus === 3 || currStatus === 7)
+            const deptsToShow = (currStatus === 0 || currStatus === 2 || currStatus === 3 || currStatus === 7)
                 ? allDepts.filter(dept => dept.is_exec > 0)
                 : allDepts.filter(dept => dept.is_exec === 0);
             deptsToShow
