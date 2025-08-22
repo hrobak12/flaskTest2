@@ -868,7 +868,7 @@ def generate_shipping_label(dept_id):
     # Повертаємо PDF як відповідь
     buffer.seek(0)
     return Response(buffer.getvalue(), mimetype='application/pdf',
-                    headers={"Content-Disposition": "attachment;filename=shipping_label_"+str(dept_id)+".pdf"})
+                    headers={"Content-Disposition": "attachment;filename=shipping_label_"+receiver_dept.deptname.encode('utf-8').decode('latin-1')+".pdf"})
 
 #****************** експериментально. звіт "що зроблено за день"
 # Маршрут для відображення сторінки
